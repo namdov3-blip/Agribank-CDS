@@ -5,14 +5,14 @@ streamlit
 Thư viện xử lý dữ liệu chính
 pandas
 
-Thư viện tạo biểu đồ tương tác (Bắt buộc cho Plotly Express trong dashboard)
+Thư viện tạo biểu đồ tương tác
 plotly
 
 Thư viện cho chức năng AI (sử dụng Gemini API)
 google-genai
 
-Thư viện cần thiết để pandas đọc và ghi file Excel (.xlsx)
+Thư viện cần thiết để pandas đọc/ghi file Excel (.xlsx)
 openpyxl
 
-THÊM THƯ VIỆN NÀY ĐỂ GIẢI QUYẾT LỖI to_markdown() / Hỗ trợ bảng
+Hỗ trợ cho các hàm xử lý bảng
 tabulate
