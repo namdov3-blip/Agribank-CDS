@@ -1,4 +1,3 @@
-%%writefile app.py
 # Streamlit Dashboard for KLTT (Overall, Document, Findings, Actions) - Colab Ready
 # Run in Colab:
 #   1) pip install streamlit pandas plotly openpyxl pyngrok
