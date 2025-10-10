@@ -1,18 +1,5 @@
-requirements.txt
-Thư viện chính cho Streamlit
 streamlit
-
-Thư viện xử lý dữ liệu chính
 pandas
-
-Thư viện tạo biểu đồ tương tác
-plotly
-
-Thư viện cho chức năng AI (sử dụng Gemini API)
-google-genai
-
-Thư viện cần thiết để pandas đọc/ghi file Excel (.xlsx)
+altair
 openpyxl
-
-Hỗ trợ cho các hàm xử lý bảng
-tabulate
+plotly
