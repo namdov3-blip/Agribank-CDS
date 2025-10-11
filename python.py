@@ -134,30 +134,21 @@ COL_MAP = {
         "sample_outstanding_checked_vnd": ["sample_outstanding_checked_vnd"],
 
         # --- Bổ sung theo yêu cầu ---
-        # Nợ xấu nhóm 3/4/5
         "npl_group3_vnd": ["npl_group3_vnd"],
         "npl_group4_vnd": ["npl_group4_vnd"],
         "npl_group5_vnd": ["npl_group5_vnd"],
-
-        # Cơ cấu kỳ hạn
         "structure_term_short_vnd": ["structure_term_short_vnd"],
         "structure_term_medium_long_vnd": ["structure_term_medium_long_vnd"],
-
-        # Cơ cấu tiền tệ
         "structure_currency_vnd_vnd": ["structure_currency_vnd_vnd"],
         "structure_currency_fx_vnd": ["structure_currency_fx_vnd"],
-
-        # Cơ cấu mục đích
         "structure_purpose_bds_flexible_vnd": ["structure_purpose_bds_flexible_vnd"],
-        "strucuture_purpose_securities_vnd": ["strucuture_purpose_securities_vnd"],  # giữ nguyên theo tên bạn đưa
+        "strucuture_purpose_securities_vnd": ["strucuture_purpose_securities_vnd"],
         "structure_purpose_consumption_vnd": ["structure_purpose_consumption_vnd"],
         "structure_purpose_trade_vnd": ["structure_purpose_trade_vnd"],
         "structure_purpose_other_vnd": ["structure_purpose_other_vnd"],
-
-        # Cơ cấu theo thành phần kinh tế
         "strucuture_econ_state_vnd": ["strucuture_econ_state_vnd"],
         "strucuture_econ_nonstate_enterprises_vnd": ["strucuture_econ_nonstate_enterprises_vnd"],
-        "strucuture_econ_individuals_households_vnd": ["strucuture_econ_individuals_households_vnd"],
+        "strucuture_econ_individuals_households_vnd": ["strucuture_econ_individuals_households_vnd"]
     },
     "findings": {
         "category": ["category"],
@@ -214,7 +205,7 @@ for c in ["issue_date","period_start","period_end"]:
     if c in df_docs.columns:
         df_docs[c] = safe_date(df_docs[c])
 
-# Numeric (tự động áp dụng cho cột mới ở Overalls)
+# Numeric
 for c in COL_MAP["overalls"].keys():
     if c in df_over.columns: df_over[c] = df_over[c].apply(to_number)
 for c in ["quantified_amount","impacted_accounts"]:
@@ -240,56 +231,43 @@ st.sidebar.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['im
 
 tab_docs, tab_over, tab_find, tab_act = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions"])
 
-# ---- Documents (no dropdown; render all docs) ----
+# ---- Documents ----
 with tab_docs:
     st.header("Báo Cáo Kết Luận Thanh Tra (Metadata)")
     st.markdown("---")
-    if len(df_docs) == 0:
-        st.info("Không có dữ liệu documents.")
-    else:
-        for idx, row in df_docs.reset_index(drop=True).iterrows():
-            st.markdown(f'<div class="doc-wrap"><div class="doc-title">📝 Báo cáo kết luận thanh tra — {str(row.get("doc_id","—"))}</div>', unsafe_allow_html=True)
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                info_card("Mã số kết luận thanh tra (Doc_id)", str(row.get("doc_id","—")))
-                info_card("Đơn vị phát hành (Issuing_authority)", str(row.get("issuing_authority","—")))
-                info_card("Người kiểm soát (Signer_name)", str(row.get("signer_name","—")))
-            with c2:
-                d = row.get("issue_date", pd.NaT)
-                info_card("Ngày phát hành (Issue_date)", d.strftime("%d/%m/%Y") if pd.notna(d) else "—")
-                info_card("Đơn vị được kiểm tra (inspected_entity_name)", str(row.get("inspected_entity_name","—")))
-                info_card("Chức vụ (Signer_title)", str(row.get("signer_title","—")))
-            with c3:
-                info_card("Title", str(row.get("title","—")))
-                info_card("Lĩnh vực (sector)", str(row.get("sector","—")))
-            with c4:
-                ps = row.get("period_start", pd.NaT); pe = row.get("period_end", pd.NaT)
-                info_card("Thời gian bắt đầu (period_start)", ps.strftime("%d/%m/%Y") if pd.notna(ps) else "—")
-                info_card("Thời gian kết thúc (period_end)", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
-            st.markdown("</div>", unsafe_allow_html=True)
+    for _, row in df_docs.iterrows():
+        st.markdown(f"### 📝 {row.get('doc_id','—')}")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            info_card("Đơn vị phát hành", row.get("issuing_authority"))
+        with c2:
+            info_card("Ngày phát hành", row.get("issue_date"))
+        with c3:
+            info_card("Người ký", row.get("signer_name"))
+        with c4:
+            info_card("Chức vụ", row.get("signer_title"))
 
 # ---- Overalls ----
 with tab_over:
     st.header("Thông Tin Tổng Quan")
     st.markdown("---")
     over_row = df_over.iloc[-1] if len(df_over) else pd.Series({})
+
     k1,k2,k3,k4,k5 = st.columns(5)
     with k1:
         st.metric("Tổng nhân sự", f"{int(over_row.get('staff_total', np.nan)) if pd.notna(over_row.get('staff_total', np.nan)) else '—'}")
         st.metric("Mẫu kiểm tra", f"{int(over_row.get('sample_total_files', np.nan)) if pd.notna(over_row.get('sample_total_files', np.nan)) else '—'}")
     with k2:
-        st.metric("Phòng nghiệp vụ (HQ)", f"{int(over_row.get('departments_at_hq_count', np.nan)) if pd.notna(over_row.get('departments_at_hq_count', np.nan)) else '—'}")
+        st.metric("Phòng nghiệp vụ", f"{int(over_row.get('departments_at_hq_count', np.nan)) if pd.notna(over_row.get('departments_at_hq_count', np.nan)) else '—'}")
         st.metric("Phòng giao dịch", f"{int(over_row.get('transaction_offices_count', np.nan)) if pd.notna(over_row.get('transaction_offices_count', np.nan)) else '—'}")
     with k3:
-        st.metric("Nguồn vốn gần nhất", format_vnd(over_row.get("mobilized_capital_vnd", np.nan)))
+        st.metric("Nguồn vốn", format_vnd(over_row.get("mobilized_capital_vnd", np.nan)))
     with k4:
-        st.metric("Dư nợ gần nhất", format_vnd(over_row.get("loans_outstanding_vnd", np.nan)))
+        st.metric("Dư nợ", format_vnd(over_row.get("loans_outstanding_vnd", np.nan)))
     with k5:
-        st.metric("Nợ xấu gần nhất", format_vnd(over_row.get("npl_total_vnd", np.nan)))
-        st.metric("Tỷ lệ NPL / Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f}%" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
-        st.metric("Tổng dư nợ đã kiểm tra", format_vnd(over_row.get("sample_outstanding_checked_vnd", np.nan)))
+        st.metric("Nợ xấu", format_vnd(over_row.get("npl_total_vnd", np.nan)))
+        st.metric("Tỷ lệ NPL/Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f}%" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
 
-    # --- Bổ sung hiển thị chi tiết ---
     st.markdown("### 📌 Nợ xấu theo nhóm (nếu có)")
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -333,38 +311,4 @@ with tab_over:
     with e3:
         st.metric("Cá nhân/Hộ gia đình", format_vnd(over_row.get("strucuture_econ_individuals_households_vnd", np.nan)))
 
-# ---- Findings ----
-with tab_find:
-    st.header("Phát hiện & Nguyên nhân (Findings)")
-    st.subheader(f"Đang lọc theo: {len(selected_refs)}/{len(all_refs)} legal_reference")
-    st.markdown("---")
-    if f_df.empty:
-        st.warning("Không có dữ liệu theo bộ lọc hiện tại.")
-    else:
-        col1, col2 = st.columns(2)
-        with col1:
-            cat_count = f_df["category"].value_counts().reset_index()
-            cat_count.columns = ["Category","Count"]
-            fig1 = px.bar(cat_count, x="Category", y="Count", text="Count", color="Category",
-                          title="Số lần xuất hiện theo Category")
-            fig1.update_traces(textposition="outside")
-            fig1.update_layout(height=380, xaxis_title="", yaxis_title="Số lần")
-            st.plotly_chart(fig1, use_container_width=True)
-        with col2:
-            cat_sub = f_df.groupby(["category","sub_category"]).size().reset_index(name="Count")
-            fig2 = px.bar(cat_sub, x="category", y="Count", color="sub_category",
-                          title="Category × Sub_category (số lần)", barmode="group",
-                          labels={"category":"Category","sub_category":"Sub_category","Count":"Số lần"})
-            fig2.update_layout(height=380)
-            st.plotly_chart(fig2, use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("Xu hướng theo Legal_reference (gộp RAWx → RAW)")
-        legal_count = f_df["legal_reference_chart"].value_counts().reset_index()
-        legal_count.columns = ["Legal_reference","Count"]
-        fig3 = px.line(legal_count, x="Legal_reference", y="Count", markers=True,
-                       title="Số lần xuất hiện theo Legal_reference (gộp RAWx→RAW)")
-        st.plotly_chart(fig3, use_container_width=True)
-        st.info("RAW = luật/quy định không được nhắc tới; ô trống đã gán RAW1, RAW2… và gộp thành RAW cho biểu đồ.")
-
-        st.ma
+st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
