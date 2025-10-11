@@ -78,8 +78,8 @@ def format_vnd(n):
 # === NEW: Gemini REST helper ===
 def gemini_generate(message: str) -> str:
     """Gọi Google Gemini API với API key từ st.secrets, trả về text ngắn gọn."""
-    api_key = st.secrets.get("GEMINI_API_KEY", "")
-    model   = st.secrets.get("GEMINI_MODEL", "gemini-1.5-flash")
+    api_key = st.secrets.get("GEMINI_API_KEY = "AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc"")
+    model   = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
     sys_prompt = st.secrets.get("GEMINI_SYSTEM_PROMPT", "")
     if not api_key:
         return "❗ Chưa cấu hình GEMINI_API_KEY trong .streamlit/secrets.toml"
