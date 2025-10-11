@@ -1,7 +1,7 @@
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
-# Yêu cầu: pip install streamlit pandas altair openpyxl plotly requests (Cần thêm google-genai để tích hợp Gemini API thực tế)
+# Yêu cầu: pip install streamlit pandas altair openpyxl plotly requests google-genai
 
 import io
 import numpy as np
@@ -9,10 +9,15 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-import requests # ĐÃ THÊM LẠI: Cho RAG Webhook
-# Thêm thư viện Google GenAI
-from google import genai
-from google.genai import types
+import requests # Cho RAG Webhook
+# Thêm thư viện Google GenAI (Đã sử dụng chính thức thay vì Mock)
+try:
+    from google import genai
+    from google.genai import types
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -160,13 +165,14 @@ def info_card(label, value):
     )
 
 # ==========================================================
-# RAG CHAT LOGIC (KHÔI PHỤC LOGIC GỌI N8N WEBHOOK)
+# RAG CHAT LOGIC (SỬA LỖI THÔNG BÁO CẤU HÌNH)
 # ==========================================================
 
 def call_rag_api(prompt: str):
     """Gọi n8n Webhook để giao tiếp với RAG Chatbot."""
+    # SỬA LỖI: Đảm bảo tên biến và thông báo lỗi trùng khớp
     if "N8N_WEBHOOK_URL" not in st.secrets:
-        return "**[LỖI CẤU HÌNH]** Vui lòng thiết lập N8N_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot RAG."
+        return "**[LỖI CẤU HÌNH]** Vui lòng thiết lập **N8N_WEBHOOK_URL** trong file .streamlit/secrets.toml để sử dụng Chatbot RAG."
 
     webhook_url = st.secrets["N8N_WEBHOOK_URL"]
 
@@ -197,7 +203,7 @@ def rag_chat_tab():
     """Thêm khung chat RAG vào tab."""
     st.header("🤖 Chat với RAG Chatbot (Dựa trên Dữ liệu KLTT)")
 
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử RAG)", type="primary"):
+    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử RAG)", key="rag_reset_button", type="primary"):
         reset_rag_chat_session()
         return
 
@@ -249,56 +255,76 @@ def rag_chat_tab():
                 st.session_state.rag_chat_counter += 1
 
 # ==========================================================
-# GEMINI CHAT LOGIC (GIỮ LOGIC CŨ, TÁCH BIẾN/HÀM)
+# GEMINI CHAT LOGIC (TÍCH HỢP SDK THỰC TẾ)
 # ==========================================================
 
-def call_gemini_api(prompt: str):
-    """
-    Hàm này mô phỏng việc gọi API Gemini, thay thế cho n8n Webhook.
-    TRONG THỰC TẾ, bạn cần tích hợp Google Generative AI SDK (google-genai) ở đây.
-    """
-    # *** HƯỚNG DẪN TÍCH HỢP GEMINI SDK THỰC TẾ ***
-    # Vui lòng cài đặt: pip install google-genai
-    # Đảm bảo có: st.secrets["GEMINI_API_KEY"]
-    # **********************************************
-    
-    # Logic kiểm tra cấu hình và trả lời mô phỏng
+# Khởi tạo Gemini Client (Chỉ chạy một lần)
+@st.cache_resource
+def get_gemini_client():
     if "GEMINI_API_KEY" not in st.secrets:
-        return "**[LỖI CẤU HÌNH]** Vui lòng thiết lập GEMINI_API_KEY trong file .streamlit/secrets.toml để sử dụng Chatbot Gemini."
-    
-    # Mocking a simple response (Giả lập phản hồi của Gemini)
-    return f"Chào bạn, tôi là Gemini (Mock API) đã được tích hợp thành công. Bạn hỏi: **'{prompt}'**. Để tích hợp thực tế, vui lòng cài đặt `google-genai` SDK và điền API key vào `secrets.toml`."
-
+        return None
+    try:
+        # Sử dụng API Key từ secrets.toml
+        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+        return client
+    except Exception as e:
+        st.error(f"Lỗi khởi tạo Gemini Client: {e}")
+        return None
 
 def reset_gemini_chat_session():
     """Hàm này sẽ reset toàn bộ lịch sử chat và biến đếm cho Gemini bot."""
-    
-    # 1. Reset lịch sử chat
+    # Reset chat_session trong Streamlit
+    if "gemini_chat_session" in st.session_state:
+        del st.session_state.gemini_chat_session
+        
     st.session_state.gemini_chat_history = []
-    
-    # 2. Reset biến đếm
     if "gemini_chat_counter" in st.session_state:
         st.session_state.gemini_chat_counter = 0
 
-    # 3. Thêm tin nhắn chào mừng mới
     st.session_state.gemini_chat_history.append(
-        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Chào bạn, tôi là Gemini. Hãy hỏi tôi về mọi thứ."}
+        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Chào bạn, tôi là Gemini (tích hợp SDK). Hãy hỏi tôi về mọi thứ."}
     )
-    
-    # Dùng st.rerun() để làm mới giao diện ngay lập tức
     st.rerun()
-
 
 def gemini_chat_tab():
     """Thêm khung chat Gemini vào tab."""
-    st.header("✨ Chat với Gemini (Mock API - General Purpose)")
+    st.header("✨ Chat với Gemini (Tích hợp SDK)")
     
     # Đặt nút Reset thủ công
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử Gemini)", type="primary"):
+    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử Gemini)", key="gemini_reset_button", type="primary"):
         reset_gemini_chat_session()
         return
 
-    # 1. KHỞI TẠO BIẾN ĐẾM & LỊCH SỬ CHAT
+    # 1. KHỞI TẠO CLIENT VÀ LỊCH SỬ CHAT
+    if not GEMINI_AVAILABLE:
+        st.error("Thiếu thư viện `google-genai`. Vui lòng chạy: `pip install google-genai`.")
+        return
+
+    client = get_gemini_client()
+    if client is None and "GEMINI_API_KEY" not in st.secrets:
+        st.warning("Vui lòng thiết lập GEMINI_API_KEY trong file .streamlit/secrets.toml để sử dụng Chatbot Gemini.")
+        return
+    
+    # Khởi tạo chat session (lưu trong session_state)
+    if "gemini_chat_session" not in st.session_state:
+        # Sử dụng model hỗ trợ chat
+        system_instruction = "You are a friendly and helpful assistant. Respond to all queries in Vietnamese. Keep your answers concise."
+        
+        config = types.GenerateContentConfig(
+            system_instruction=system_instruction
+        )
+        
+        try:
+            st.session_state.gemini_chat_session = client.chats.create(
+                model="gemini-2.5-flash", 
+                config=config
+            )
+        except Exception as e:
+            st.error(f"Lỗi tạo Gemini Chat Session: {e}. Vui lòng kiểm tra API Key và model.")
+            st.stop()
+
+
+    # 1. KHỞI TẠO LỊCH SỬ CHAT TRÊN UI (TÁCH BIỆT VỚI CHAT SESSION CỦA GEMINI)
     if "gemini_chat_history" not in st.session_state:
         st.session_state.gemini_chat_history = []
         st.session_state.gemini_chat_counter = 0
@@ -310,14 +336,9 @@ def gemini_chat_tab():
     st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
 
     st.markdown("---")
-
-    # Kiểm tra API Key
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.warning("Vui lòng thiết lập GEMINI_API_KEY trong file .streamlit/secrets.toml để sử dụng Chatbot Gemini.")
         
     # Hiển thị lịch sử chat
     for message in st.session_state.gemini_chat_history:
-        # Sử dụng avatar tùy chỉnh cho Gemini
         avatar = "✨" if message["role"] == "assistant" else "👤"
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
@@ -341,9 +362,12 @@ def gemini_chat_tab():
         # 2. Gọi API Gemini
         with st.chat_message("assistant", avatar="✨"):
             with st.spinner("Gemini đang xử lý..."):
-                
-                # Gọi hàm mô phỏng (hoặc tích hợp SDK thực tế tại đây)
-                response_text = call_gemini_api(user_prompt)
+                try:
+                    # Gửi tin nhắn đến chat session của Gemini
+                    response = st.session_state.gemini_chat_session.send_message(user_prompt)
+                    response_text = response.text
+                except Exception as e:
+                    response_text = f"**[LỖI GEMINI]** Không thể nhận phản hồi: {e}"
                 
                 st.markdown(response_text)
                 
@@ -484,13 +508,14 @@ with st.sidebar:
 # Tabs (BAO GỒM CẢ RAG BOT VÀ GEMINI BOT)
 # ==============================
 
+# Cập nhật tên tab cho Gemini
 tab_docs, tab_over, tab_find, tab_act, tab_rag, tab_gemini = st.tabs([
     "📝 Documents",
     "📊 Overalls",
     "🚨 Findings",
     "✅ Actions",
     "🤖 Chatbot RAG",    # Tab RAG Bot
-    "✨ Gemini (Mock)"   # Tab Gemini Bot
+    "✨ Gemini (SDK)"   # Tab Gemini Bot (Đã cập nhật)
 ])
 
 # ---- RAG Chat Tab (GỌI HÀM KHÔI PHỤC) ----
