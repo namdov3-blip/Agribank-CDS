@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-import requests # THÊM MỚI: Thư viện để gọi n8n Webhook
+import requests  # THÊM MỚI: Thư viện để gọi n8n Webhook & Gemini
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -194,89 +194,193 @@ def call_n8n_chatbot(prompt: str):
 
 def reset_rag_chat_session():
     """Hàm này sẽ reset toàn bộ lịch sử chat và session ID."""
-    
-    # 1. Reset lịch sử chat
     st.session_state.rag_chat_history = []
-    
-    # 2. Reset biến đếm
     if "rag_chat_counter" in st.session_state:
         st.session_state.rag_chat_counter = 0
-
-    # 3. Reset ID phiên chat (quan trọng để n8n cũng quên lịch sử)
     if "chat_session_id" in st.session_state:
         del st.session_state.chat_session_id
-    
-    # 4. Thêm tin nhắn chào mừng mới
     st.session_state.rag_chat_history.append(
         {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Chào bạn, tôi là Trợ lý RAG được kết nối qua n8n. Hãy hỏi tôi về các thông tin KLTT."}
     )
-    
-    # Dùng st.rerun() để làm mới giao diện ngay lập tức
     st.rerun()
-
 
 def rag_chat_tab():
     """Thêm khung chat RAG kết nối qua n8n Webhook vào tab."""
     st.header("🤖 Trợ lý RAG (Hỏi & Đáp Dữ liệu KLTT)")
-    
-    # Đặt nút Reset thủ công
     if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử)", type="primary"):
         reset_rag_chat_session()
-        # Hàm đã gọi st.rerun(), nên code không chạy tiếp
         return 
 
-    # 1. KHỞI TẠO BIẾN ĐẾM & LỊCH SỬ CHAT
     if "rag_chat_history" not in st.session_state:
         st.session_state.rag_chat_history = []
         st.session_state.rag_chat_counter = 0
         st.session_state.rag_chat_history.append(
             {"role": "assistant", "content": "Chào bạn, tôi là Trợ lý RAG được kết nối qua n8n. Hãy hỏi tôi về các thông tin KLTT."}
         )
-    
     current_count = st.session_state.get("rag_chat_counter", 0)
     st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
-
     st.markdown("---")
 
-    # Kiểm tra URL Webhook
     if "N8N_WEBHOOK_URL" not in st.secrets:
         st.warning("Vui lòng thiết lập N8N_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot.")
         return
 
-    # Hiển thị lịch sử chat
     for message in st.session_state.rag_chat_history:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # 2. XỬ LÝ INPUT VÀ LOGIC RESET TỰ ĐỘNG
     if user_prompt := st.chat_input("Hỏi Trợ lý RAG...", key="rag_chat_input"):
-        
-        # KIỂM TRA VÀ RESET PHIÊN CHAT (Tự động sau 5 câu)
         if st.session_state.rag_chat_counter >= 5:
-            # Gửi thông báo reset (hiển thị trong phiên cũ trước khi reset)
             with st.chat_message("assistant"):
                 st.info("Phiên trò chuyện đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
-            
-            # Thực hiện reset và st.rerun()
             reset_rag_chat_session()
             return
 
-        # 1. Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
         st.session_state.rag_chat_history.append({"role": "user", "content": user_prompt})
         with st.chat_message("user"):
             st.markdown(user_prompt)
 
-        # 2. Gọi API n8n
         with st.chat_message("assistant"):
             with st.spinner("RAG Chatbot (n8n) đang xử lý..."):
-                
                 response_text = call_n8n_chatbot(user_prompt)
-                
                 st.markdown(response_text)
-                
-                # 3. Cập nhật lịch sử chat với câu trả lời VÀ TĂNG BIẾN ĐẾM
                 st.session_state.rag_chat_history.append({"role": "assistant", "content": response_text})
                 st.session_state.rag_chat_counter += 1
+
+# ==============================
+# GEMINI CHATBOX (MỚI THÊM)
+# ==============================
+
+def _get_gemini_model_name():
+    # Cho phép override qua secrets; mặc định dùng Gemini 1.5 Pro
+    return st.secrets.get("GEMINI_MODEL", "models/gemini-1.5-pro")
+
+def call_gemini(messages: list):
+    """
+    Gọi Google Generative Language API cho chat.
+    - messages: danh sách dict {"role": "user"/"model", "content": str}
+    """
+    if "GEMINI_API_KEY" not in st.secrets:
+        return "Lỗi cấu hình: Thiếu GEMINI_API_KEY trong secrets.toml."
+
+    api_key = st.secrets["GEMINI_API_KEY"]
+    model = _get_gemini_model_name()
+
+    # Chuyển đổi sang schema contents của Gemini
+    contents = []
+    for m in messages:
+        role = "user" if m["role"] == "user" else "model"
+        contents.append({
+            "role": role,
+            "parts": [{"text": m["content"][:20000]}]  # cắt an toàn nếu prompt quá dài
+        })
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/{model}:generateContent?key={api_key}"
+    payload = {
+        "contents": contents,
+        "generationConfig": {
+            "temperature": 0.4,
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 2048
+        },
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_SEXUAL", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+        ]
+    }
+
+    try:
+        resp = requests.post(url, json=payload, timeout=90)
+        resp.raise_for_status()
+        data = resp.json()
+        # Đọc text từ candidates
+        cands = data.get("candidates", [])
+        if not cands:
+            return "Gemini không trả về nội dung. Vui lòng thử lại."
+        parts = cands[0].get("content", {}).get("parts", [])
+        if not parts:
+            return "Gemini không có phần trả lời hợp lệ."
+        text = "".join(p.get("text", "") for p in parts).strip()
+        return text if text else "Gemini trả lời rỗng."
+    except requests.exceptions.Timeout:
+        return "Gemini: Hết thời gian chờ (Timeout 90s). Vui lòng thử lại."
+    except requests.exceptions.RequestException as e:
+        return f"Lỗi kết nối tới Gemini: {e}"
+    except Exception as e:
+        return f"Lỗi xử lý phản hồi từ Gemini: {e}"
+
+def reset_gemini_session():
+    st.session_state.gemini_history = []
+    st.session_state.gemini_turns = 0
+    st.session_state.gemini_history.append(
+        {"role": "model", "content": "Xin chào 👋 Tôi là **Gemini**. Hãy đặt câu hỏi hoặc mô tả tác vụ bạn cần hỗ trợ."}
+    )
+    st.rerun()
+
+def gemini_chat_tab():
+    """Khung chat Gemini riêng, tương tự RAG bot; giữ độc lập lịch sử."""
+    st.header("🧠 Gemini Chat (General AI)")
+    # Nút reset
+    if st.button("🔄 Reset phiên Gemini", key="gemini_reset_btn"):
+        reset_gemini_session()
+        return
+
+    # Khởi tạo lịch sử
+    if "gemini_history" not in st.session_state:
+        st.session_state.gemini_history = [
+            {"role": "model", "content": "Xin chào 👋 Tôi là **Gemini**. Hãy đặt câu hỏi hoặc mô tả tác vụ bạn cần hỗ trợ."}
+        ]
+        st.session_state.gemini_turns = 0
+
+    st.caption("Mẹo: Dùng Gemini cho các câu hỏi tổng quát, soạn thảo, gợi ý ý tưởng… (Không ràng buộc dữ liệu KLTT).")
+    st.markdown("---")
+
+    # Cảnh báo cấu hình
+    if "GEMINI_API_KEY" not in st.secrets:
+        st.warning("Thiếu `GEMINI_API_KEY` trong `.streamlit/secrets.toml`. Vui lòng thêm để sử dụng Gemini.")
+        st.code(
+            """
+# .streamlit/secrets.toml
+GEMINI_API_KEY = "your_api_key_here"
+# Tùy chọn: đổi model
+# GEMINI_MODEL = "models/gemini-1.5-flash"  # hoặc models/gemini-1.5-pro
+            """.strip(),
+            language="toml"
+        )
+
+    # Hiển thị lịch sử
+    for m in st.session_state.gemini_history:
+        with st.chat_message("assistant" if m["role"] == "model" else "user"):
+            st.markdown(m["content"])
+
+    # Input
+    if user_msg := st.chat_input("Nhắn với Gemini...", key="gemini_chat_input"):
+        # Append user
+        st.session_state.gemini_history.append({"role": "user", "content": user_msg})
+        with st.chat_message("user"):
+            st.markdown(user_msg)
+
+        # Chuẩn bị messages (lấy tối đa ~8 lượt gần nhất để giữ ngữ cảnh)
+        history = st.session_state.gemini_history
+        window = []
+        turns = 0
+        for msg in reversed(history):
+            window.insert(0, msg)
+            if msg["role"] == "user":
+                turns += 1
+            if turns >= 8:  # giới hạn ngữ cảnh
+                break
+
+        # Gọi API
+        with st.chat_message("assistant"):
+            with st.spinner("Gemini đang soạn trả lời..."):
+                reply = call_gemini(window)
+                st.markdown(reply)
+                st.session_state.gemini_history.append({"role": "model", "content": reply})
+                st.session_state.gemini_turns += 1
 
 # ==============================
 # Column mappings (GIỮ NGUYÊN)
@@ -345,7 +449,6 @@ COL_MAP = {
     }
 }
 
-
 # ==============================
 # Sidebar (Upload + Filters) (GIỮ NGUYÊN)
 # ==============================
@@ -406,17 +509,21 @@ with st.sidebar:
     st.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
     st.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
 
-
 # ==============================
-# Tabs (ĐÃ THÊM TAB CHATBOT)
+# Tabs (ĐÃ THÊM TAB CHATBOT + GEMINI)
 # ==============================
 
-# THÊM '🤖 Chatbot' VÀO DANH SÁCH TABS
-tab_docs, tab_over, tab_find, tab_act, tab_chat = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions", "🤖 Chatbot"])
+tab_docs, tab_over, tab_find, tab_act, tab_chat, tab_gemini = st.tabs(
+    ["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions", "🤖 Chatbot", "🧠 Gemini"]
+)
 
-# ---- Chatbot Tab (GỌI HÀM MỚI) ----
+# ---- Chatbot Tab (RAG qua n8n) ----
 with tab_chat:
     rag_chat_tab()
+
+# ---- Gemini Tab (MỚI) ----
+with tab_gemini:
+    gemini_chat_tab()
 
 # ---- Documents (GIỮ NGUYÊN) ----
 with tab_docs:
@@ -445,7 +552,6 @@ with tab_docs:
                 info_card("Thời gian bắt đầu (period_start)", ps.strftime("%d/%m/%Y") if pd.notna(ps) else "—")
                 info_card("Thời gian kết thúc (period_end)", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
             st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ---- Overalls (GIỮ NGUYÊN) ----
 with tab_over:
