@@ -210,18 +210,40 @@ def rag_chat_tab():
     # Khởi tạo lịch sử chat
     if "rag_chat_history" not in st.session_state:
         st.session_state.rag_chat_history = []
+        st.session_state.rag_chat_counter = 0 # Biến đếm mới
         st.session_state.rag_chat_history.append(
-            {"role": "assistant", "content": "Chào bạn, tôi là Trợ lý RAG được kết nối qua n8n. Hãy hỏi tôi về các thông tin KLTT."}
+            {"role": "assistant", "content": "Chào bạn, tôi là Trợ lý RAG nội bộ. Hãy hỏi tôi về các thông tin KLTT."}
         )
 
     # Hiển thị lịch sử chat
     for message in st.session_state.rag_chat_history:
         with st.chat_message(message["role"]): # Dùng st.chat_message thay vì st.sidebar.chat_message
             st.markdown(message["content"])
-
+    # 2. XỬ LÝ INPUT VÀ LOGIC RESET
     # Xử lý input người dùng
     # Đặt chat_input ở cuối trang hoặc dưới dạng widget chính
     if user_prompt := st.chat_input("Hỏi Trợ lý RAG...", key="rag_chat_input"):
+        
+        # KIỂM TRA VÀ RESET PHIÊN CHAT
+        if st.session_state.rag_chat_counter >= 5:
+            # Gửi thông báo reset
+            with st.chat_message("assistant"):
+                st.info("Phiên trò chuyện đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
+            
+            # Reset lịch sử và biến đếm
+            st.session_state.rag_chat_history = []
+            st.session_state.rag_chat_counter = 0
+            
+            # Reset ID phiên chat để n8n cũng quên lịch sử
+            if "chat_session_id" in st.session_state:
+                del st.session_state.chat_session_id
+            
+            # THOÁT KHỎI HÀM để Streamlit tự động redraw
+            # Việc này đảm bảo thông báo reset được hiển thị trước khi câu hỏi mới được xử lý
+            st.rerun() 
+            # Dùng st.rerun() sẽ đảm bảo phiên chat được làm sạch hoàn toàn trên giao diện.
+
+        
         # 1. Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
         st.session_state.rag_chat_history.append({"role": "user", "content": user_prompt})
         with st.chat_message("user"):
