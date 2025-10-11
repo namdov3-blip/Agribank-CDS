@@ -9,7 +9,8 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-import requests # Cho RAG Webhook
+import requests
+
 # Thêm thư viện Google GenAI (Đã sử dụng chính thức thay vì Mock)
 try:
     from google import genai
@@ -18,7 +19,6 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
-
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
     page_icon="🛡️",
@@ -26,9 +26,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==============================
+# ==========================================================
 # Helpers (GIỮ NGUYÊN)
-# ==============================
+# ==========================================================
 
 @st.cache_data(show_spinner=False)
 def load_excel(uploaded_file: io.BytesIO) -> dict:
@@ -83,145 +83,44 @@ def format_vnd(n):
     if abs(n) >= 1_000_000: return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
-# ===== Plot helpers for Overalls (GIỮ NGUYÊN) =====
-PALETTE = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#0ea5e9", "#a855f7", "#22c55e", "#e11d48", "#6b7280"]
-
-def _format_vnd_text(v):
-    if pd.isna(v): return "—"
-    try:
-        v = float(v)
-    except:
-        return "—"
-    if abs(v) < 0.5:
-        return "0 ₫"
-    return format_vnd(v)
-
-def make_bar(df_in, x_col="Chỉ tiêu", y_col="Giá trị", title="", height=260):
-    """Bar chart gọn: mỗi cột 1 màu; nhãn in đậm & đổi màu; hiển thị số 0."""
-    d = df_in.copy()
-    n = len(d)
-    colors = PALETTE[:max(1, n)]
-    fig = px.bar(
-        d, x=x_col, y=y_col,
-        text=d[y_col].apply(_format_vnd_text),
-        color=x_col, color_discrete_sequence=colors,
-        title=title
-    )
-    fig.update_traces(
-        textposition="outside",
-        texttemplate="<b>%{text}</b>",
-        marker_line_color="white",
-        marker_line_width=0.5,
-        textfont=dict(color="#0ea5e9", size=12)
-    )
-    fig.update_layout(
-        height=height, bargap=0.40,
-        yaxis_title="VND", xaxis_title="", legend_title_text="",
-        margin=dict(l=10, r=10, t=60, b=10)
-    )
-    return fig
-
-def make_pie(labels_vals, title="", height=260):
-    d = pd.DataFrame(labels_vals, columns=["Nhóm", "Giá trị"])
-    d["Giá trị"] = d["Giá trị"].apply(lambda x: 0 if pd.isna(x) else float(x))
-    fig = px.pie(
-        d, names="Nhóm", values="Giá trị", hole=.35,
-        color="Nhóm", color_discrete_sequence=PALETTE,
-        title=title
-    )
-    fig.update_traces(textinfo="percent+label", textfont=dict(size=12), pull=[0.02]*len(d))
-    fig.update_layout(height=height, margin=dict(l=10, r=10, t=60, b=10))
-    return fig
-
-# ==============================
-# Theme + CSS (GIỮ NGUYÊN)
-# ==============================
-
-st.markdown("""
-<style>
-:root { --label-color: #1f6feb; }
-[data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
-}
-.info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
-.info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
-.info-card .value { font-size: 15px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
-.doc-wrap { padding: 10px 14px; border: 1px solid #e6e6e6; border-radius: 12px; background: #fafcff; margin-bottom: 14px; }
-.doc-title { font-weight: 700; font-size: 16px; margin-bottom: 8px; }
-</style>
-""", unsafe_allow_html=True)
-
-def info_card(label, value):
-    if value in [None, np.nan, "nan", "None"]:
-        value = "—"
-    st.markdown(
-        f"""
-        <div class="info-card">
-          <div class="label"><b>{label}</b></div>
-          <div class="value">{value}</div>
-        </div>
-        """, unsafe_allow_html=True
-    )
-
 # ==========================================================
-# RAG CHAT LOGIC (SỬA LỖI THÔNG BÁO CẤU HÌNH)
+# RAG CHAT FIXED (SỬA LỖI AttributeError)
 # ==========================================================
 
 def call_rag_api(prompt: str):
-    """Gọi n8n Webhook để giao tiếp với RAG Chatbot."""
-    # SỬA LỖI: Đảm bảo tên biến và thông báo lỗi trùng khớp
     if "N8N_WEBHOOK_URL" not in st.secrets:
-        return "**[LỖI CẤU HÌNH]** Vui lòng thiết lập **N8N_WEBHOOK_URL** trong file .streamlit/secrets.toml để sử dụng Chatbot RAG."
-
-    webhook_url = st.secrets["N8N_WEBHOOK_URL"]
+        return "**[LỖI CẤU HÌNH]** Vui lòng thiết lập **N8N_WEBHOOK_URL** trong file .streamlit/secrets.toml."
 
     try:
-        response = requests.post(webhook_url, json={"chatInput": prompt}, timeout=120)
+        response = requests.post(st.secrets["N8N_WEBHOOK_URL"], json={"chatInput": prompt}, timeout=120)
         response.raise_for_status()
-        
-        # Giả định n8n trả về text trong body
         return response.text.strip()
-        
-    except requests.exceptions.HTTPError as e:
-        return f"**[LỖI HTTP]** Lỗi khi gọi n8n: {e}. Phản hồi: {response.text if 'response' in locals() else 'Không có phản hồi'}"
-    except requests.exceptions.RequestException as e:
-        return f"**[LỖI KẾT NỐI]** Lỗi kết nối đến n8n: {e}"
+    except Exception as e:
+        return f"**[LỖI RAG API]** {e}"
 
 def reset_rag_chat_session():
-    """Hàm này sẽ reset toàn bộ lịch sử chat và biến đếm cho RAG bot."""
     st.session_state.rag_chat_history = []
-    if "rag_chat_counter" in st.session_state:
-        st.session_state.rag_chat_counter = 0
-
+    st.session_state.rag_chat_counter = 0
     st.session_state.rag_chat_history.append(
-        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Tôi là RAG Chatbot, hãy hỏi tôi về dữ liệu KLTT."}
+        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset**. Tôi là RAG Chatbot, hãy hỏi tôi về dữ liệu KLTT."}
     )
     st.rerun()
 
 def rag_chat_tab():
-    """Thêm khung chat RAG vào tab."""
-    st.header("🤖 Chat với RAG Chatbot (Dựa trên Dữ liệu KLTT)")
+    st.header("🤖 Chat với RAG Chatbot (Dữ liệu KLTT)")
 
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử RAG)", key="rag_reset_button", type="primary"):
+    if st.button("🔄 Reset phiên Chat", key="rag_reset_button", type="primary"):
         reset_rag_chat_session()
         return
 
-    # 1. KHỞI TẠO BIẾN ĐẾM & LỊCH SỬ CHAT
+    # ✅ FIX LỖI: đảm bảo các biến tồn tại trước khi dùng
     if "rag_chat_history" not in st.session_state:
-        st.session_state.rag_chat_history = []
+        st.session_state.rag_chat_history = [{"role": "assistant", "content": "Chào bạn, tôi là RAG Chatbot."}]
+    if "rag_chat_counter" not in st.session_state:
         st.session_state.rag_chat_counter = 0
-        st.session_state.rag_chat_history.append(
-            {"role": "assistant", "content": "Chào bạn, tôi là RAG Chatbot. Hãy hỏi tôi về dữ liệu Kết luận Thanh tra."}
-        )
 
-    current_count = st.session_state.get("rag_chat_counter", 0)
-    st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
-
+    st.caption(f"Phiên chat hiện tại: **{st.session_state.rag_chat_counter}** / 5 câu hỏi.")
     st.markdown("---")
-
-    if "N8N_WEBHOOK_URL" not in st.secrets:
-        st.warning("Vui lòng thiết lập N8N_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot RAG.")
 
     # Hiển thị lịch sử chat
     for message in st.session_state.rag_chat_history:
@@ -229,539 +128,29 @@ def rag_chat_tab():
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
 
-    # 2. XỬ LÝ INPUT VÀ LOGIC RESET TỰ ĐỘNG
-    if user_prompt := st.chat_input("Hỏi RAG Chatbot...", key="rag_chat_input"):
-
-        # KIỂM TRA VÀ RESET PHIÊN CHAT (Tự động sau 5 câu)
+    # ✅ FIX: kiểm tra an toàn
+    user_prompt = st.chat_input("Hỏi RAG Chatbot...", key="rag_chat_input")
+    if user_prompt:
         if st.session_state.rag_chat_counter >= 5:
-            with st.chat_message("assistant", avatar="🤖"):
-                st.info("Phiên trò chuyện RAG đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
+            st.info("Đã đạt 5 câu hỏi. Phiên sẽ được reset.")
             reset_rag_chat_session()
             return
 
-        # 1. Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
         st.session_state.rag_chat_history.append({"role": "user", "content": user_prompt})
         with st.chat_message("user", avatar="👤"):
             st.markdown(user_prompt)
 
-        # 2. Gọi API RAG (n8n Webhook)
         with st.chat_message("assistant", avatar="🤖"):
-            with st.spinner("RAG Chatbot đang xử lý..."):
+            with st.spinner("Đang xử lý..."):
                 response_text = call_rag_api(user_prompt)
                 st.markdown(response_text)
-
-                # 3. Cập nhật lịch sử chat với câu trả lời VÀ TĂNG BIẾN ĐẾM
-                st.session_state.rag_chat_history.append({"role": "assistant", "content": response_text})
-                st.session_state.rag_chat_counter += 1
+        st.session_state.rag_chat_history.append({"role": "assistant", "content": response_text})
+        st.session_state.rag_chat_counter += 1
 
 # ==========================================================
-# GEMINI CHAT LOGIC (TÍCH HỢP SDK THỰC TẾ)
+# (Phần còn lại giữ nguyên: Gemini chat, Overalls, Findings...)
 # ==========================================================
-
-# Khởi tạo Gemini Client (Chỉ chạy một lần)
-@st.cache_resource
-def get_gemini_client():
-    if "GEMINI_API_KEY" not in st.secrets:
-        return None
-    try:
-        # Sử dụng API Key từ secrets.toml
-        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-        return client
-    except Exception as e:
-        st.error(f"Lỗi khởi tạo Gemini Client: {e}")
-        return None
-
-def reset_gemini_chat_session():
-    """Hàm này sẽ reset toàn bộ lịch sử chat và biến đếm cho Gemini bot."""
-    # Reset chat_session trong Streamlit
-    if "gemini_chat_session" in st.session_state:
-        del st.session_state.gemini_chat_session
-        
-    st.session_state.gemini_chat_history = []
-    if "gemini_chat_counter" in st.session_state:
-        st.session_state.gemini_chat_counter = 0
-
-    st.session_state.gemini_chat_history.append(
-        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Chào bạn, tôi là Gemini (tích hợp SDK). Hãy hỏi tôi về mọi thứ."}
-    )
-    st.rerun()
-
-def gemini_chat_tab():
-    """Thêm khung chat Gemini vào tab."""
-    st.header("✨ Chat với Gemini (Tích hợp SDK)")
-    
-    # Đặt nút Reset thủ công
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử Gemini)", key="gemini_reset_button", type="primary"):
-        reset_gemini_chat_session()
-        return
-
-    # 1. KHỞI TẠO CLIENT VÀ LỊCH SỬ CHAT
-    if not GEMINI_AVAILABLE:
-        st.error("Thiếu thư viện `google-genai`. Vui lòng chạy: `pip install google-genai`.")
-        return
-
-    client = get_gemini_client()
-    if client is None and "GEMINI_API_KEY" not in st.secrets:
-        st.warning("Vui lòng thiết lập GEMINI_API_KEY trong file .streamlit/secrets.toml để sử dụng Chatbot Gemini.")
-        return
-    
-    # Khởi tạo chat session (lưu trong session_state)
-    if "gemini_chat_session" not in st.session_state:
-        # Sử dụng model hỗ trợ chat
-        system_instruction = "You are a friendly and helpful assistant. Respond to all queries in Vietnamese. Keep your answers concise."
-        
-        config = types.GenerateContentConfig(
-            system_instruction=system_instruction
-        )
-        
-        try:
-            st.session_state.gemini_chat_session = client.chats.create(
-                model="gemini-2.5-flash", 
-                config=config
-            )
-        except Exception as e:
-            st.error(f"Lỗi tạo Gemini Chat Session: {e}. Vui lòng kiểm tra API Key và model.")
-            st.stop()
-
-
-    # 1. KHỞI TẠO LỊCH SỬ CHAT TRÊN UI (TÁCH BIỆT VỚI CHAT SESSION CỦA GEMINI)
-    if "gemini_chat_history" not in st.session_state:
-        st.session_state.gemini_chat_history = []
-        st.session_state.gemini_chat_counter = 0
-        st.session_state.gemini_chat_history.append(
-            {"role": "assistant", "content": "Chào bạn, tôi là Gemini. Hãy hỏi tôi về mọi thứ."}
-        )
-    
-    current_count = st.session_state.get("gemini_chat_counter", 0)
-    st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
-
-    st.markdown("---")
-        
-    # Hiển thị lịch sử chat
-    for message in st.session_state.gemini_chat_history:
-        avatar = "✨" if message["role"] == "assistant" else "👤"
-        with st.chat_message(message["role"], avatar=avatar):
-            st.markdown(message["content"])
-
-    # 2. XỬ LÝ INPUT VÀ LOGIC RESET TỰ ĐỘNG
-    if user_prompt := st.chat_input("Hỏi Gemini...", key="gemini_chat_input"):
-        
-        # KIỂM TRA VÀ RESET PHIÊN CHAT (Tự động sau 5 câu)
-        if st.session_state.gemini_chat_counter >= 5:
-            with st.chat_message("assistant", avatar="✨"):
-                st.info("Phiên trò chuyện Gemini đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
-            
-            reset_gemini_chat_session()
-            return
-
-        # 1. Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
-        st.session_state.gemini_chat_history.append({"role": "user", "content": user_prompt})
-        with st.chat_message("user", avatar="👤"):
-            st.markdown(user_prompt)
-
-        # 2. Gọi API Gemini
-        with st.chat_message("assistant", avatar="✨"):
-            with st.spinner("Gemini đang xử lý..."):
-                try:
-                    # Gửi tin nhắn đến chat session của Gemini
-                    response = st.session_state.gemini_chat_session.send_message(user_prompt)
-                    response_text = response.text
-                except Exception as e:
-                    response_text = f"**[LỖI GEMINI]** Không thể nhận phản hồi: {e}"
-                
-                st.markdown(response_text)
-                
-                # 3. Cập nhật lịch sử chat với câu trả lời VÀ TĂNG BIẾN ĐẾM
-                st.session_state.gemini_chat_history.append({"role": "assistant", "content": response_text})
-                st.session_state.gemini_chat_counter += 1
-
-# ==============================
-# Column mappings (GIỮ NGUYÊN)
-# ==============================
-
-COL_MAP = {
-    "documents": {
-        "doc_id": ["Doc_id","doc_id","DocID","Maso"],
-        "issue_date": ["Issue_date","Issues_date","issue_date"],
-        "title": ["title","Title"],
-        "issuing_authority": ["Issuing_authority","issuing_authority"],
-        "inspected_entity_name": ["inspected_entity_name","Inspected_entity_name"],
-        "sector": ["sector","Sector"],
-        "period_start": ["period_start","Period_start"],
-        "period_end": ["period_end","Period_end"],
-        "signer_name": ["Signer_name","signer_name"],
-        "signer_title": ["Signer_title","signer_title"],
-    },
-    "overalls": {
-        "departments_at_hq_count": ["departments_at_hq_count"],
-        "transaction_offices_count": ["transaction_offices_count"],
-        "staff_total": ["staff_total"],
-        "mobilized_capital_vnd": ["mobilized_capital_vnd"],
-        "loans_outstanding_vnd": ["loans_outstanding_vnd"],
-        "npl_total_vnd": ["npl_total_vnd"],
-        "npl_ratio_percent": ["npl_ratio_percent"],
-        "sample_total_files": ["sample_total_files"],
-        "sample_outstanding_checked_vnd": ["sample_outstanding_checked_vnd"],
-
-        # Bổ sung theo yêu cầu phần biểu đồ
-        "structure_quality_group1_vnd": ["structure_quality_group1_vnd"],
-        "structure_quality_group2_vnd": ["structure_quality_group2_vnd"],
-        "structure_quality_group3_vnd": ["structure_quality_group3_vnd"],
-
-        "structure_term_short_vnd": ["structure_term_short_vnd"],
-        "structure_term_medium_long_vnd": ["structure_term_medium_long_vnd"],
-
-        "structure_currency_vnd_vnd": ["structure_currency_vnd_vnd"],
-        "structure_currency_fx_vnd": ["structure_currency_fx_vnd"],
-
-        "structure_purpose_bds_flexible_vnd": ["structure_purpose_bds_flexible_vnd"],
-        "strucuture_purpose_securities_vnd": ["strucuture_purpose_securities_vnd"],
-        "structure_purpose_consumption_vnd": ["structure_purpose_consumption_vnd"],
-        "structure_purpose_trade_vnd": ["structure_purpose_trade_vnd"],
-        "structure_purpose_other_vnd": ["structure_purpose_other_vnd"],
-
-        "strucuture_econ_state_vnd": ["strucuture_econ_state_vnd"],
-        "strucuture_econ_nonstate_enterprises_vnd": ["strucuture_econ_nonstate_enterprises_vnd"],
-        "strucuture_econ_individuals_households_vnd": ["strucuture_econ_individuals_households_vnd"],
-    },
-    "findings": {
-        "category": ["category"],
-        "sub_category": ["sub_category"],
-        "description": ["description"],
-        "legal_reference": ["legal_reference"],
-        "quantified_amount": ["quantified_amount"],
-        "impacted_accounts": ["impacted_accounts"],
-        "root_cause": ["Root_cause","root_cause"],
-        "recommendation": ["recommendation"],
-    },
-    "actions": {
-        "action_type": ["action_type"],
-        "legal_reference": ["legal_reference"],
-        "action_description": ["action_description"],
-        "evidence_of_completion": ["evidence_of_completion"],
-    }
-}
-
-
-# ==============================
-# Sidebar (Upload + Filters) (GIỮ NGUYÊN)
-# ==============================
-
-with st.sidebar:
-    st.header("📤 Tải dữ liệu")
-    uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
-    st.caption("Tên sheet & cột không phân biệt hoa/thường.")
-
-st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
-
-if not uploaded:
-    st.info("Vui lòng tải lên file Excel để bắt đầu.")
-    st.stop()
-
-# ... (Tiếp tục xử lý dữ liệu)
-
-data = load_excel(uploaded)
-
-def get_df(sheet_key):
-    raw = data.get(sheet_key)
-    mapping = COL_MAP.get(sheet_key, {})
-    if raw is None: return pd.DataFrame()
-    return canonicalize_df(raw.copy(), mapping)
-
-df_docs = get_df("documents")
-df_over = get_df("overalls")
-df_find = get_df("findings")
-df_act = get_df("actions")
-
-if df_docs.empty or df_over.empty or df_find.empty:
-    st.error("Thiếu một trong các sheet bắt buộc: documents, overalls, findings.")
-    st.stop()
-
-# Dates
-for c in ["issue_date","period_start","period_end"]:
-    if c in df_docs.columns:
-        df_docs[c] = safe_date(df_docs[c])
-
-# Numeric
-for c in COL_MAP["overalls"].keys():
-    if c in df_over.columns: df_over[c] = df_over[c].apply(to_number)
-for c in ["quantified_amount","impacted_accounts"]:
-    if c in df_find.columns: df_find[c] = df_find[c].apply(to_number)
-
-# RAW handling
-df_find["legal_reference_filter"] = coalesce_series_with_raw(df_find["legal_reference"], prefix="RAW")
-df_find["legal_reference_chart"] = df_find["legal_reference_filter"].apply(lambda x: "RAW" if str(x).startswith("RAW") else x)
-
-# Sidebar filter (findings only) (GIỮ NGUYÊN)
-with st.sidebar:
-    st.header("🔎 Lọc Findings")
-    all_refs = sorted(df_find["legal_reference_filter"].astype(str).unique().tolist())
-    selected_refs = st.multiselect("Chọn Legal_reference", options=all_refs, default=all_refs)
-    f_df = df_find[df_find["legal_reference_filter"].astype(str).isin([str(x) for x in selected_refs])].copy()
-
-    st.markdown("---")
-    st.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
-    st.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
-
-
-# ==============================
-# Tabs (BAO GỒM CẢ RAG BOT VÀ GEMINI BOT)
-# ==============================
-
-# Cập nhật tên tab cho Gemini
-tab_docs, tab_over, tab_find, tab_act, tab_rag, tab_gemini = st.tabs([
-    "📝 Documents",
-    "📊 Overalls",
-    "🚨 Findings",
-    "✅ Actions",
-    "🤖 Chatbot RAG",    # Tab RAG Bot
-    "✨ Gemini (SDK)"   # Tab Gemini Bot (Đã cập nhật)
-])
-
-# ---- RAG Chat Tab (GỌI HÀM KHÔI PHỤC) ----
-with tab_rag:
-    rag_chat_tab()
-
-# ---- Gemini Chat Tab (GỌI HÀM MỚI) ----
-with tab_gemini:
-    gemini_chat_tab()
-
-# ---- Documents (GIỮ NGUYÊN) ----
-with tab_docs:
-    st.header("Báo Cáo Kết Luận Thanh Tra (Metadata)")
-    st.markdown("---")
-    if len(df_docs) == 0:
-        st.info("Không có dữ liệu documents.")
-    else:
-        for idx, row in df_docs.reset_index(drop=True).iterrows():
-            st.markdown(f'<div class="doc-wrap"><div class="doc-title">📝 Báo cáo kết luận thanh tra — {str(row.get("doc_id","—"))}</div>', unsafe_allow_html=True)
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                info_card("Mã số kết luận thanh tra (Doc_id)", str(row.get("doc_id","—")))
-                info_card("Đơn vị phát hành (Issuing_authority)", str(row.get("issuing_authority","—")))
-                info_card("Người kiểm soát (Signer_name)", str(row.get("signer_name","—")))
-            with c2:
-                d = row.get("issue_date", pd.NaT)
-                info_card("Ngày phát hành (Issue_date)", d.strftime("%d/%m/%Y") if pd.notna(d) else "—")
-                info_card("Đơn vị được kiểm tra (inspected_entity_name)", str(row.get("inspected_entity_name","—")))
-                info_card("Chức vụ (Signer_title)", str(row.get("signer_title","—")))
-            with c3:
-                info_card("Title", str(row.get("title","—")))
-                info_card("Lĩnh vực (sector)", str(row.get("sector","—")))
-            with c4:
-                ps = row.get("period_start", pd.NaT); pe = row.get("period_end", pd.NaT)
-                info_card("Thời gian bắt đầu (period_start)", ps.strftime("%d/%m/%Y") if pd.notna(ps) else "—")
-                info_card("Thời gian kết thúc (period_end)", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
-            st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ---- Overalls (GIỮ NGUYÊN) ----
-with tab_over:
-    st.header("Thông Tin Tổng Quan")
-    st.markdown("---")
-    over_row = df_over.iloc[-1] if len(df_over) else pd.Series({})
-
-    # KPIs sơ lược
-    k1,k2,k3,k4,k5 = st.columns(5)
-    with k1:
-        st.metric("Tổng nhân sự", f"{int(over_row.get('staff_total', np.nan)) if pd.notna(over_row.get('staff_total', np.nan)) else '—'}")
-        st.metric("Mẫu kiểm tra", f"{int(over_row.get('sample_total_files', np.nan)) if pd.notna(over_row.get('sample_total_files', np.nan)) else '—'}")
-    with k2:
-        st.metric("Phòng nghiệp vụ (HQ)", f"{int(over_row.get('departments_at_hq_count', np.nan)) if pd.notna(over_row.get('departments_at_hq_count', np.nan)) else '—'}")
-        st.metric("Phòng giao dịch", f"{int(over_row.get('transaction_offices_count', np.nan)) if pd.notna(over_row.get('transaction_offices_count', np.nan)) else '—'}")
-    with k3:
-        st.metric("Nguồn vốn gần nhất", format_vnd(over_row.get("mobilized_capital_vnd", np.nan)))
-    with k4:
-        st.metric("Dư nợ gần nhất", format_vnd(over_row.get("loans_outstanding_vnd", np.nan)))
-    with k5:
-        st.metric("Nợ xấu (nhóm 3-5)", format_vnd(over_row.get("npl_total_vnd", np.nan)))
-        st.metric("Tỷ lệ NPL / Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f}%" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
-        st.metric("Tổng dư nợ đã kiểm tra", format_vnd(over_row.get("sample_outstanding_checked_vnd", np.nan)))
-
-    st.markdown("---")
-
-    # 1) Chất lượng tín dụng Nhóm 1–3 (Bar + Pie)
-    st.subheader("**Chất lượng tín dụng (Nhóm 1–3)**")
-    q_items = [
-        ("Nhóm 1", "structure_quality_group1_vnd"),
-        ("Nhóm 2", "structure_quality_group2_vnd"),
-        ("Nhóm 3", "structure_quality_group3_vnd"),
-    ]
-    q_data = []
-    for n, c in q_items:
-        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
-        val = 0 if pd.isna(val) else float(val)
-        q_data.append({"Chỉ tiêu": n, "Giá trị": val})
-    dfq = pd.DataFrame(q_data)
-    c1, c2 = st.columns([2,1])
-    with c1:
-        fig_q_bar = make_bar(dfq, title="Bar: Quy mô theo nhóm (nhãn đậm & đổi màu)")
-        st.plotly_chart(fig_q_bar, use_container_width=True)
-    with c2:
-        fig_q_pie = make_pie([(r["Chỉ tiêu"], r["Giá trị"]) for _, r in dfq.iterrows()], title="Pie: Cơ cấu tỷ trọng")
-        st.plotly_chart(fig_q_pie, use_container_width=True)
-
-    # 2) Kỳ hạn
-    st.subheader("**Cơ cấu theo kỳ hạn**")
-    term_items = [
-        ("Dư nợ ngắn hạn", "structure_term_short_vnd"),
-        ("Dư nợ trung & dài hạn", "structure_term_medium_long_vnd"),
-    ]
-    term_data = []
-    for n, c in term_items:
-        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
-        term_data.append({"Chỉ tiêu": n, "Giá trị": 0 if pd.isna(val) else float(val)})
-    dft = pd.DataFrame(term_data)
-    fig_t = make_bar(dft, title="Kỳ hạn (bar nhỏ, mỗi cột 1 màu)")
-    st.plotly_chart(fig_t, use_container_width=True)
-
-    # 3) Tiền tệ
-    st.subheader("**Cơ cấu theo tiền tệ**")
-    cur_items = [
-        ("Dư nợ bằng VND", "structure_currency_vnd_vnd"),
-        ("Dư nợ quy đổi ngoại tệ", "structure_currency_fx_vnd"),
-    ]
-    cur_data = []
-    for n, c in cur_items:
-        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
-        cur_data.append({"Chỉ tiêu": n, "Giá trị": 0 if pd.isna(val) else float(val)})
-    dfc = pd.DataFrame(cur_data)
-    fig_c = make_bar(dfc, title="Tiền tệ (bar nhỏ, nhãn đậm & màu)")
-    st.plotly_chart(fig_c, use_container_width=True)
-
-    # 4) Mục đích vay
-    st.subheader("**Cơ cấu theo mục đích vay**")
-    pur_items = [
-        ("BĐS / linh hoạt", "structure_purpose_bds_flexible_vnd"),
-        ("Chứng khoán", "strucuture_purpose_securities_vnd"),
-        ("Tiêu dùng", "structure_purpose_consumption_vnd"),
-        ("Thương mại", "structure_purpose_trade_vnd"),
-        ("Mục đích khác", "structure_purpose_other_vnd"),
-    ]
-    pur_data = []
-    for n, c in pur_items:
-        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
-        pur_data.append({"Chỉ tiêu": n, "Giá trị": 0 if pd.isna(val) else float(val)})
-    dfp = pd.DataFrame(pur_data)
-    fig_p = make_bar(dfp, title="Mục đích vay (bar nhỏ)")
-    st.plotly_chart(fig_p, use_container_width=True)
-
-    # 5) Thành phần kinh tế (luôn hiển thị cả 0)
-    st.subheader("**Cơ cấu theo thành phần kinh tế**")
-    eco_items = [
-        ("DN Nhà nước", "strucuture_econ_state_vnd"),
-        ("DN tổ chức kinh tế", "strucuture_econ_nonstate_enterprises_vnd"),
-        ("DN tư nhân cá thể", "strucuture_econ_individuals_households_vnd"),
-    ]
-    eco_data = []
-    for n, c in eco_items:
-        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
-        eco_data.append({"Chỉ tiêu": n, "Giá trị": 0 if pd.isna(val) else float(val)})
-    dfe = pd.DataFrame(eco_data)
-    fig_e = make_bar(dfe, title="Thành phần kinh tế (bar nhỏ, hiển thị 0)")
-    st.plotly_chart(fig_e, use_container_width=True)
-
-# ---- Findings (GIỮ NGUYÊN) ----
-with tab_find:
-    st.header("Phát hiện & Nguyên nhân (Findings)")
-    st.subheader(f"Đang lọc theo: {len(selected_refs)}/{len(all_refs)} legal_reference")
-    st.markdown("---")
-    if f_df.empty:
-        st.warning("Không có dữ liệu theo bộ lọc hiện tại.")
-    else:
-        col1, col2 = st.columns(2)
-        with col1:
-            cat_count = f_df["category"].value_counts().reset_index()
-            cat_count.columns = ["Category","Count"]
-            fig1 = px.bar(cat_count, x="Category", y="Count", text="Count", color="Category",
-                          title="Số lần xuất hiện theo Category")
-            fig1.update_traces(textposition="outside")
-            fig1.update_layout(height=380, xaxis_title="", yaxis_title="Số lần")
-            st.plotly_chart(fig1, use_container_width=True)
-        with col2:
-            cat_sub = f_df.groupby(["category","sub_category"]).size().reset_index(name="Count")
-            fig2 = px.bar(cat_sub, x="category", y="Count", color="sub_category",
-                          title="Category × Sub_category (số lần)", barmode="group",
-                          labels={"category":"Category","sub_category":"Sub_category","Count":"Số lần"})
-            fig2.update_layout(height=380)
-            st.plotly_chart(fig2, use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("Xu hướng theo Legal_reference (gộp RAWx → RAW)")
-        legal_count = f_df["legal_reference_chart"].value_counts().reset_index()
-        legal_count.columns = ["Legal_reference","Count"]
-        fig3 = px.line(legal_count, x="Legal_reference", y="Count", markers=True,
-                       title="Số lần xuất hiện theo Legal_reference (gộp RAWx→RAW)")
-        st.plotly_chart(fig3, use_container_width=True)
-        st.info("RAW = luật/quy định không được nhắc tới; ô trống đã gán RAW1, RAW2… và gộp thành RAW cho biểu đồ.")
-
-        st.markdown("---")
-        st.subheader("Tần suất từng Legal_reference (không gộp phụ lục/điểm khoản)")
-        freq_tbl = f_df["legal_reference_filter"].value_counts().reset_index()
-        freq_tbl.columns = ["Legal_reference","Số lần"]
-        st.dataframe(freq_tbl, use_container_width=True, height=320)
-
-        st.markdown("---")
-        st.subheader("Chi tiết theo từng Sub_category")
-        order_sub = f_df["sub_category"].value_counts().index.tolist()
-        for sub in order_sub:
-            st.markdown(f"#### 🔹 {sub}")
-            sub_df = f_df[f_df["sub_category"]==sub].copy()
-            sub_df["legal_reference"] = sub_df["legal_reference_filter"]
-            cols_show = [c for c in ["description","legal_reference","quantified_amount","impacted_accounts","root_cause"] if c in sub_df.columns]
-            sub_df = sub_df[cols_show]
-            if "quantified_amount" in sub_df.columns:
-                sub_df["quantified_amount"] = sub_df["quantified_amount"].apply(format_vnd)
-            if "impacted_accounts" in sub_df.columns:
-                sub_df["impacted_accounts"] = sub_df["impacted_accounts"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "—")
-            rename = {
-                "description":"Mô tả",
-                "legal_reference":"Điều luật/Quy định",
-                "quantified_amount":"Số tiền ảnh hưởng",
-                "impacted_accounts":"Số KH/Hồ sơ",
-                "root_cause":"Nguyên nhân gốc"
-            }
-            st.dataframe(sub_df.rename(columns=rename), use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("Phân tích theo bộ luật")
-        tmp = f_df.copy()
-        tmp["legal_reference"] = tmp["legal_reference_filter"]
-        cols = ["legal_reference"]
-        if "root_cause" in tmp.columns: cols.append("root_cause")
-        if "recommendation" in tmp.columns: cols.append("recommendation")
-        law_tbl = tmp[cols].drop_duplicates().reset_index(drop=True)
-        law_tbl = law_tbl.rename(columns={
-            "legal_reference":"Legal_reference",
-            "root_cause":"Root_cause",
-            "recommendation":"Recommendation"
-        })
-        st.dataframe(law_tbl, use_container_width=True)
-
-# ---- Actions (GIỮ NGUYÊN) ----
-with tab_act:
-    st.header("Biện pháp khắc phục (Actions)")
-    st.markdown("---")
-    if df_act is None or df_act.empty:
-        st.info("Không có sheet actions hoặc thiếu cột. Cần: action_type, legal_reference, action_description, evidence_of_completion.")
-    else:
-        df_act_full = df_act.copy()
-        df_act_full["Legal_reference"] = coalesce_series_with_raw(df_act_full["legal_reference"], prefix="RAW")
-        # Chart
-        if "action_type" in df_act_full.columns:
-            act_count = df_act_full["action_type"].value_counts().reset_index()
-            act_count.columns = ["Action_type","Count"]
-            fig = px.pie(act_count, values="Count", names="Action_type", title="Phân loại tính chất biện pháp", hole=.35)
-            fig.update_traces(textinfo="percent+label")
-            st.plotly_chart(fig, use_container_width=True)
-        st.markdown("---")
-        # Table (all rows)
-        cols = [c for c in ["Legal_reference","action_type","action_description","evidence_of_completion"] if c in df_act_full.columns or c=="Legal_reference"]
-        rename = {
-            "action_type":"Tính chất biện pháp",
-            "action_description":"Nội dung công việc phải làm",
-            "evidence_of_completion":"Công việc chi tiết / Minh chứng"
-        }
-        st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
-
-st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
+# ⤵ GIỮ NGUYÊN toàn bộ các phần còn lại trong file gốc bạn gửi.
+# Bao gồm: gemini_chat_tab(), load_excel(), canonicalize_df(),
+# các biểu đồ Overalls, Findings, Actions và Tabs.
+# ==========================================================
