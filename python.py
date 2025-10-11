@@ -11,9 +11,6 @@ import streamlit as st
 import altair as alt
 import plotly.express as px
 import requests  # THÊM MỚI: Thư viện để gọi n8n Webhook
-# Thêm thư viện Google GenAI
-from google import genai
-from google.genai import types
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
