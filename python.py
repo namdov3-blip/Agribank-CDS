@@ -1,7 +1,8 @@
+
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
-# Yêu cầu: pip install streamlit pandas altair openpyxl plotly google-genai requests
+# Yêu cầu: pip install streamlit pandas altair openpyxl plotly
 
 import io
 import numpy as np
@@ -9,12 +10,6 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-# Không cần import components.v1 nữa vì không dùng iframe
-# import streamlit.components.v1 as components 
-import requests
-from google import genai
-from google.genai.errors import APIError
-from typing import Literal
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -76,70 +71,20 @@ def format_vnd(n):
     if pd.isna(n): return "—"
     n = float(n)
     if abs(n) >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ ₫"
-    if abs(n) >= 1_000_000_000:       return f"{n/1_000_000_000:.2f} tỷ ₫"
-    if abs(n) >= 1_000_000:           return f"{n/1_000_000:.2f} triệu ₫"
+    if abs(n) >= 1_000_000_000:     return f"{n/1_000_000_000:.2f} tỷ ₫"
+    if abs(n) >= 1_000_000:         return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
-
-# ==============================
-# API Functions for Chatbot
-# ==============================
-
-@st.cache_resource
-def get_gemini_client():
-    """Khởi tạo và trả về Gemini client."""
-    api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key:
-        st.warning("GEMINI_API_KEY chưa được cấu hình trong secrets.")
-        return None
-    try:
-        return genai.Client(api_key=api_key)
-    except Exception as e:
-        st.error(f"Lỗi khởi tạo Gemini Client: {e}")
-        return None
-
-def call_gemini_api(client: genai.Client, prompt: str) -> str:
-    """Gọi Gemini API và trả về phản hồi."""
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash", # Hoặc model phù hợp với yêu cầu của bạn
-            contents=prompt
-        )
-        return response.text
-    except APIError as e:
-        return f"Lỗi Gemini API: {e}"
-    except Exception as e:
-        return f"Lỗi không xác định khi gọi Gemini: {e}"
-
-def call_rag_api(api_url: str, prompt: str) -> str:
-    """Gọi RAG Bot API (n8n Webhook) và trả về phản hồi."""
-    if not api_url:
-        return "Lỗi: RAG Bot API URL chưa được cấu hình."
-    try:
-        headers = {'Content-Type': 'application/json'}
-        # Giả định n8n Webhook nhận JSON với trường 'text'
-        payload = {"text": prompt}
-        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-        
-        response.raise_for_status() # Báo lỗi nếu HTTP response code là lỗi
-
-        # Giả định n8n trả về JSON với trường 'response' chứa câu trả lời
-        return response.json().get('response', 'Không tìm thấy câu trả lời từ RAG Bot.')
-        
-    except requests.exceptions.RequestException as e:
-        return f"Lỗi kết nối hoặc API RAG Bot: {e}"
-    except Exception as e:
-        return f"Lỗi không xác định khi gọi RAG Bot: {e}"
 
 # ==============================
 # Theme + CSS
 # ==============================
-# ... (Giữ nguyên đoạn mã CSS)
+
 st.markdown("""
 <style>
 :root { --label-color: #1f6feb; }
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
 }
 .info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
@@ -162,8 +107,9 @@ def info_card(label, value):
     )
 
 # ==============================
-# Column mappings (Giữ nguyên)
+# Column mappings
 # ==============================
+
 COL_MAP = {
     "documents": {
         "doc_id": ["Doc_id","doc_id","DocID","Maso"],
@@ -207,116 +153,52 @@ COL_MAP = {
 }
 
 # ==============================
-# Sidebar (Upload + Filters + Chatbots API)
+# Sidebar (Upload + Filters)
 # ==============================
 
 with st.sidebar:
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
-    
-    # --- Chatbot API Config ---
-    st.markdown("---")
-    st.subheader("⚙️ Cấu hình API")
-    
-    # Sử dụng text_input cho RAG URL vì nó thường là Webhook public
-    rag_n8n_url = st.text_input(
-        "RAG Bot (n8n) Webhook URL", 
-        value=st.secrets.get("RAG_N8N_API_URL", ""), 
-        placeholder="https://your-n8n-domain/webhook/xxxx", 
-        key="rag_url_input"
-    )
-    
-    # Hướng dẫn config API Key cho Gemini (nên dùng secrets.toml)
-    if not st.secrets.get("AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc"):
-        st.warning("⚠️ Vui lòng đặt Gemini API Key trong `secrets.toml`:\n`GEMINI_API_KEY = \"YOUR_KEY\"`")
-        
-    st.session_state["RAG_N8N_API_URL"] = rag_n8n_url
 
-    # --- CHATBOT UI (Sử dụng Tab trong Sidebar) ---
-    st.markdown("---")
-    st.header("🤖 Trò chuyện AI")
-    
-    # Sử dụng tab để người dùng chọn bot muốn chat
-    chat_tab_gem, chat_tab_rag = st.tabs(["✨ Gemini", "💬 RAG Bot"])
+st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
 
-    # ----------------------------------------------------
-    # CHAT BOT 1: GEMINI (Sử dụng Google GenAI SDK)
-    # ----------------------------------------------------
-    with chat_tab_gem:
-        if not st.secrets.get("AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc"):
-            st.error("Chưa có GEMINI_API_KEY. Không thể sử dụng.")
-            st.stop()
-            
-        # Khởi tạo client 
-        client = get_gemini_client()
-        if not client:
-             st.stop()
+if not uploaded:
+    st.info("Vui lòng tải lên file Excel để bắt đầu.")
+    st.stop()
 
-        # Khởi tạo lịch sử chat
-        if "messages_gemini" not in st.session_state:
-            st.session_state.messages_gemini = []
+data = load_excel(uploaded)
 
-        # Hiển thị lịch sử chat
-        for message in st.session_state.messages_gemini:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+def get_df(sheet_key):
+    raw = data.get(sheet_key)
+    mapping = COL_MAP.get(sheet_key, {})
+    if raw is None: return pd.DataFrame()
+    return canonicalize_df(raw.copy(), mapping)
 
-        # Xử lý input mới
-        prompt = st.chat_input("Hỏi Gemini về bất cứ điều gì...", key="gemini_prompt_input")
-        if prompt:
-            # Lưu và hiển thị prompt người dùng
-            st.session_state.messages_gemini.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            
-            # Gọi API và hiển thị phản hồi
-            with st.chat_message("assistant"):
-                with st.spinner("Gemini đang trả lời..."):
-                    response = call_gemini_api(client, prompt)
-                st.markdown(response)
-                # Lưu phản hồi vào lịch sử
-                st.session_state.messages_gemini.append({"role": "assistant", "content": response})
+df_docs = get_df("documents")
+df_over = get_df("overalls")
+df_find = get_df("findings")
+df_act  = get_df("actions")
 
-    # ----------------------------------------------------
-    # CHAT BOT 2: RAG BOT (Sử dụng Request API)
-    # ----------------------------------------------------
-    with chat_tab_rag:
-        rag_url = st.session_state.get("RAG_N8N_API_URL")
-        if not rag_url:
-            st.warning("Vui lòng nhập RAG Bot Webhook URL.")
-        
-        # Khởi tạo lịch sử chat
-        if "messages_rag" not in st.session_state:
-            st.session_state.messages_rag = []
+if df_docs.empty or df_over.empty or df_find.empty:
+    st.error("Thiếu một trong các sheet bắt buộc: documents, overalls, findings.")
+    st.stop()
 
-        # Hiển thị lịch sử chat
-        for message in st.session_state.messages_rag:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+# Dates
+for c in ["issue_date","period_start","period_end"]:
+    if c in df_docs.columns:
+        df_docs[c] = safe_date(df_docs[c])
 
-        # Xử lý input mới
-        prompt = st.chat_input("Hỏi RAG Bot về dữ liệu thanh tra...", key="rag_prompt_input")
-        if prompt:
-            # Lưu và hiển thị prompt người dùng
-            st.session_state.messages_rag.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+# Numeric
+for c in COL_MAP["overalls"].keys():
+    if c in df_over.columns: df_over[c] = df_over[c].apply(to_number)
+for c in ["quantified_amount","impacted_accounts"]:
+    if c in df_find.columns: df_find[c] = df_find[c].apply(to_number)
 
-            # Gọi API và hiển thị phản hồi
-            with st.chat_message("assistant"):
-                if rag_url:
-                    with st.spinner("RAG Bot đang tìm kiếm dữ liệu..."):
-                        response = call_rag_api(rag_url, prompt)
-                    st.markdown(response)
-                    # Lưu phản hồi vào lịch sử
-                    st.session_state.messages_rag.append({"role": "assistant", "content": response})
-                else:
-                    response = "Lỗi: RAG Bot URL chưa được cấu hình."
-                    st.error(response)
-                    st.session_state.messages_rag.append({"role": "assistant", "content": response})
+# RAW handling
+df_find["legal_reference_filter"] = coalesce_series_with_raw(df_find["legal_reference"], prefix="RAW")
+df_find["legal_reference_chart"] = df_find["legal_reference_filter"].apply(lambda x: "RAW" if str(x).startswith("RAW") else x)
 
-# ... (Phần còn lại của code giữ nguyên, không cần chỉnh sửa) ...
 # Sidebar filter (findings only)
 st.sidebar.header("🔎 Lọc Findings")
 all_refs = sorted(df_find["legal_reference_filter"].astype(str).unique().tolist())
@@ -486,4 +368,4 @@ with tab_act:
         }
         st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
 
-st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly • Gemini API • n8n RAG API")
+st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
