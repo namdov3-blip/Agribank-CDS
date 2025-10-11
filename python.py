@@ -45,9 +45,10 @@ def load_and_preprocess_data():
             'Hồ sơ thiếu', 'Định giá TSĐB sai', 'Vi phạm trần lãi suất', 
             'Không tuân thủ KYC', 'Phân loại nợ chưa đúng'], size=30),
         'description': [f'Mô tả chi tiết sai phạm {i+1}. Đây là nội dung dài cần được hiển thị đầy đủ.' for i in range(30)],
+        # Đã sửa lỗi độ dài mảng: 
         'legal_reference': [
             'Thông tư 39/2016/TT-NHNN', 'Luật Các TCTD 2010', '', 'Nghị định 01/2021/NĐ-CP', 
-            'Thông tư 11/2021/TT-NHNN', 'Quyết định 1627/2001/QĐ-NHNN', np.nan] * 4 + ['', ''], # Đã sửa lỗi: Thêm 1 phần tử rỗng để đảm bảo độ dài 30
+            'Thông tư 11/2021/TT-NHNN', 'Quyết định 1627/2001/QĐ-NHNN', np.nan] * 4 + ['', ''],
         'quantified_amount': np.random.randint(100000000, 5000000000, size=30),
         'impacted_accounts': np.random.randint(1, 50, size=30),
         'root_cause': np.random.choice(['Nhân sự yếu kém', 'Thiếu kiểm soát', 'Lỗi hệ thống'], size=30),
@@ -106,27 +107,50 @@ uploaded_file = st.file_uploader(
     type=["xlsx"]
 )
 
+df = None
 if uploaded_file is not None:
     try:
-        # Giả định dữ liệu nằm trong sheet đầu tiên
-        df = pd.read_excel(uploaded_file, engine='openpyxl')
-        # Tái xử lý dữ liệu để đảm bảo các cột lọc RAW
-        df = load_and_preprocess_data()
-        df = df.iloc[0:0] # Xóa dữ liệu giả định nếu tải file thật
-        st.success("Tải file thành công! Vui lòng làm lại bước xử lý dữ liệu RAW")
+        # Đọc file Excel thực tế
+        df_uploaded = pd.read_excel(uploaded_file, engine='openpyxl')
         
-        # NOTE: Đối với ứng dụng thực tế, bạn cần gọi hàm tiền xử lý dữ liệu RAW ở đây 
-        # sau khi đọc file Excel thực sự:
-        # df = preprocess_uploaded_df(df)
-        
+        if not df_uploaded.empty:
+            # Nếu file có dữ liệu, sử dụng nó và gọi hàm tiền xử lý (cần định nghĩa lại hàm này trong app thực tế)
+            # Tạm thời, chúng ta sẽ giả định file đã tải lên có đủ cấu trúc và chỉ lấy dữ liệu đã tải lên
+            
+            # NOTE: Trong môi trường thực tế, bạn cần hàm preprocess_uploaded_df(df_uploaded) để xử lý RAW và các cột khác
+            # Dưới đây là cách an toàn để tiếp tục với dữ liệu (giả sử cột tên khớp):
+            df = df_uploaded 
+            
+            # Áp dụng lại xử lý RAW (Tốt nhất là định nghĩa hàm riêng)
+            df['legal_reference'] = df['legal_reference'].fillna('')
+            raw_indices = df[df['legal_reference'] == ''].index
+            raw_map = {index: f"RAW-{i+1}" for i, index in enumerate(raw_indices)}
+            df['legal_reference_filter'] = df.apply(
+                lambda row: raw_map.get(row.name) if row['legal_reference'] == '' else row['legal_reference'], 
+                axis=1
+            )
+            df['legal_reference_chart'] = df['legal_reference_filter'].apply(
+                lambda x: 'RAW (Chưa xác định)' if 'RAW-' in x else x
+            )
+
+            st.success("Tải file thành công! Dữ liệu của bạn đang được sử dụng.")
+        else:
+            st.warning("File Excel rỗng. Đang sử dụng dữ liệu giả định.")
+            df = load_and_preprocess_data()
+            
     except Exception as e:
-        st.error(f"Lỗi khi đọc file: {e}. Vui lòng kiểm tra định dạng Excel.")
-        df = load_and_preprocess_data() # Dùng lại dữ liệu giả định nếu lỗi
+        st.error(f"Lỗi khi đọc file: {e}. Vui lòng kiểm tra định dạng Excel và tên các cột.")
+        df = load_and_preprocess_data() # Dùng lại dữ liệu giả định nếu lỗi đọc file
 else:
     # Dùng dữ liệu giả định nếu chưa có file tải lên
     df = load_and_preprocess_data()
     st.info("Sử dụng dữ liệu giả định. Vui lòng tải file Excel thực tế.")
 
+# KIỂM TRA ĐIỀU KIỆN RỖNG TRƯỚC KHI TRUY CẬP df.iloc[0]
+if df is None or df.empty:
+    st.error("Không thể tải hoặc tạo dữ liệu. Vui lòng kiểm tra lại file Excel của bạn.")
+    st.stop()
+    
 # Lấy dữ liệu Documents và Overalls (Chỉ lấy hàng đầu tiên)
 doc_data = df.iloc[0].to_dict()
 df_findings = df.copy()
