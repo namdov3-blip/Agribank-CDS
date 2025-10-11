@@ -82,6 +82,109 @@ def format_vnd(n):
 # Theme + CSS
 # ... (giữ nguyên đoạn CSS và hàm info_card)
 # ==============================
+def gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, show_context=True):
+    """Khung chat Gemini trong sidebar, dùng API key từ secrets.toml.
+    Chữ ký hàm khớp với lệnh gọi: gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, True)
+    """
+    api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc")
+    model   = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
+    sys_prompt = st.secrets.get("GEMINI_SYSTEM_PROMPT", "Bạn là trợ lý giúp phân tích kết luận thanh tra. Trả lời ngắn gọn, chính xác.")
+    if "gem_history" not in st.session_state:
+        st.session_state.gem_history = []  # [{'role':'user'|'assistant','text':str}]
+
+    # --- UI ---
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🤖 Chat với Gemini")
+
+    attach_ctx = False
+    if show_context:
+        attach_ctx = st.sidebar.checkbox("Đính kèm ngữ cảnh (từ bộ lọc & metadata)", value=True)
+
+    # Hiển thị lịch sử gần nhất
+    if st.session_state.gem_history:
+        with st.sidebar.expander("Lịch sử chat (10 gần nhất)", expanded=False):
+            for m in st.session_state.gem_history[-10:]:
+                who = "👤" if m["role"] == "user" else "🤖"
+                st.markdown(f"**{who}**: {m['text']}")
+
+    # Ô nhập
+    with st.sidebar.form("gemini_sidebar_chat_form", clear_on_submit=True):
+        q = st.text_area("Câu hỏi", placeholder="Hỏi về KLTT, pháp lý, tổng hợp phát hiện...", height=90)
+        submitted = st.form_submit_button("Gửi")
+    if not submitted or not q or not q.strip():
+        return
+
+    # --- Build prompt ---
+    user_question = q.strip()
+    context = ""
+    if attach_ctx:
+        try:
+            # Tóm tắt rất ngắn: tài liệu + filter hiện tại
+            doc_ids = []
+            if not df_docs.empty and "doc_id" in df_docs.columns:
+                doc_ids = [str(x) for x in df_docs["doc_id"].dropna().astype(str).unique().tolist()[:5]]
+            refs = []
+            if not f_df.empty and "legal_reference_filter" in f_df.columns:
+                refs = [str(x) for x in f_df["legal_reference_filter"].astype(str).unique().tolist()[:10]]
+
+            total_amt = ""
+            if "quantified_amount" in f_df.columns:
+                try:
+                    total_amt = float(f_df["quantified_amount"].sum())
+                except Exception:
+                    total_amt = ""
+            total_acct = ""
+            if "impacted_accounts" in f_df.columns:
+                try:
+                    total_acct = int(f_df["impacted_accounts"].fillna(0).sum())
+                except Exception:
+                    total_acct = ""
+
+            context_parts = []
+            if doc_ids:
+                context_parts.append(f"doc_id hiển thị: {', '.join(doc_ids)}")
+            if refs:
+                context_parts.append(f"đang lọc legal_reference: {', '.join(refs)}")
+            if total_amt != "":
+                context_parts.append(f"tổng tiền ảnh hưởng (lọc): {total_amt:,.0f} VND")
+            if total_acct != "":
+                context_parts.append(f"tổng hồ sơ ảnh hưởng (lọc): {total_acct:,}")
+
+            if context_parts:
+                context = "Ngữ cảnh hiện tại: " + " | ".join(context_parts)
+        except Exception:
+            pass
+
+    if not api_key:
+        st.sidebar.error("Chưa cấu hình `GEMINI_API_KEY` trong `.streamlit/secrets.toml`.")
+        return
+
+    # --- Gọi Gemini REST ---
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    body = {
+        "contents": [
+            {"role":"user","parts":[{"text": f"{sys_prompt}\n\n{context}\n\nCâu hỏi: {user_question}" if context else f"{sys_prompt}\n\nCâu hỏi: {user_question}"}]}
+        ]
+    }
+    try:
+        resp = requests.post(url, headers={"Content-Type":"application/json"}, json=body, timeout=60)
+        if not resp.ok:
+            st.sidebar.error(f"Gemini API lỗi: {resp.status_code} {resp.text[:250]}")
+            return
+        data = resp.json()
+        try:
+            answer = data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception:
+            answer = json.dumps(data)[:600]
+    except Exception as e:
+        st.sidebar.error(f"Lỗi gọi Gemini API: {e}")
+        return
+
+    # Cập nhật lịch sử + hiển thị
+    st.session_state.gem_history.append({"role":"user","text": user_question})
+    st.session_state.gem_history.append({"role":"assistant","text": answer})
+    st.sidebar.markdown("**🤖 Gemini:**")
+    st.sidebar.write(answer)
 
 st.markdown("""
 <style>
