@@ -1,7 +1,8 @@
+
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
-# Yêu cầu: pip install streamlit pandas altair openpyxl plotly google-genai
+# Yêu cầu: pip install streamlit pandas altair openpyxl plotly
 
 import io
 import numpy as np
@@ -9,9 +10,6 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-# Thêm thư viện Google GenAI
-from google import genai
-from google.genai import types
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -22,7 +20,6 @@ st.set_page_config(
 
 # ==============================
 # Helpers
-# ... (giữ nguyên các hàm helpers như cũ)
 # ==============================
 
 @st.cache_data(show_spinner=False)
@@ -74,124 +71,20 @@ def format_vnd(n):
     if pd.isna(n): return "—"
     n = float(n)
     if abs(n) >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ ₫"
-    if abs(n) >= 1_000_000_000:       return f"{n/1_000_000_000:.2f} tỷ ₫"
-    if abs(n) >= 1_000_000:           return f"{n/1_000_000:.2f} triệu ₫"
+    if abs(n) >= 1_000_000_000:     return f"{n/1_000_000_000:.2f} tỷ ₫"
+    if abs(n) >= 1_000_000:         return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
 # ==============================
 # Theme + CSS
-# ... (giữ nguyên đoạn CSS và hàm info_card)
 # ==============================
-def gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, show_context=True):
-    """Khung chat Gemini trong sidebar, dùng API key từ secrets.toml.
-    Chữ ký hàm khớp với lệnh gọi: gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, True)
-    """
-    api_key = st.secrets.get("GEMINI_API_KEY", "AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc")
-    model   = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
-    sys_prompt = st.secrets.get("GEMINI_SYSTEM_PROMPT", "Bạn là trợ lý giúp phân tích kết luận thanh tra. Trả lời ngắn gọn, chính xác.")
-    if "gem_history" not in st.session_state:
-        st.session_state.gem_history = []  # [{'role':'user'|'assistant','text':str}]
-
-    # --- UI ---
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🤖 Chat với Gemini")
-
-    attach_ctx = False
-    if show_context:
-        attach_ctx = st.sidebar.checkbox("Đính kèm ngữ cảnh (từ bộ lọc & metadata)", value=True)
-
-    # Hiển thị lịch sử gần nhất
-    if st.session_state.gem_history:
-        with st.sidebar.expander("Lịch sử chat (10 gần nhất)", expanded=False):
-            for m in st.session_state.gem_history[-10:]:
-                who = "👤" if m["role"] == "user" else "🤖"
-                st.markdown(f"**{who}**: {m['text']}")
-
-    # Ô nhập
-    with st.sidebar.form("gemini_sidebar_chat_form", clear_on_submit=True):
-        q = st.text_area("Câu hỏi", placeholder="Hỏi về KLTT, pháp lý, tổng hợp phát hiện...", height=90)
-        submitted = st.form_submit_button("Gửi")
-    if not submitted or not q or not q.strip():
-        return
-
-    # --- Build prompt ---
-    user_question = q.strip()
-    context = ""
-    if attach_ctx:
-        try:
-            # Tóm tắt rất ngắn: tài liệu + filter hiện tại
-            doc_ids = []
-            if not df_docs.empty and "doc_id" in df_docs.columns:
-                doc_ids = [str(x) for x in df_docs["doc_id"].dropna().astype(str).unique().tolist()[:5]]
-            refs = []
-            if not f_df.empty and "legal_reference_filter" in f_df.columns:
-                refs = [str(x) for x in f_df["legal_reference_filter"].astype(str).unique().tolist()[:10]]
-
-            total_amt = ""
-            if "quantified_amount" in f_df.columns:
-                try:
-                    total_amt = float(f_df["quantified_amount"].sum())
-                except Exception:
-                    total_amt = ""
-            total_acct = ""
-            if "impacted_accounts" in f_df.columns:
-                try:
-                    total_acct = int(f_df["impacted_accounts"].fillna(0).sum())
-                except Exception:
-                    total_acct = ""
-
-            context_parts = []
-            if doc_ids:
-                context_parts.append(f"doc_id hiển thị: {', '.join(doc_ids)}")
-            if refs:
-                context_parts.append(f"đang lọc legal_reference: {', '.join(refs)}")
-            if total_amt != "":
-                context_parts.append(f"tổng tiền ảnh hưởng (lọc): {total_amt:,.0f} VND")
-            if total_acct != "":
-                context_parts.append(f"tổng hồ sơ ảnh hưởng (lọc): {total_acct:,}")
-
-            if context_parts:
-                context = "Ngữ cảnh hiện tại: " + " | ".join(context_parts)
-        except Exception:
-            pass
-
-    if not api_key:
-        st.sidebar.error("Chưa cấu hình `GEMINI_API_KEY` trong `.streamlit/secrets.toml`.")
-        return
-
-    # --- Gọi Gemini REST ---
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    body = {
-        "contents": [
-            {"role":"user","parts":[{"text": f"{sys_prompt}\n\n{context}\n\nCâu hỏi: {user_question}" if context else f"{sys_prompt}\n\nCâu hỏi: {user_question}"}]}
-        ]
-    }
-    try:
-        resp = requests.post(url, headers={"Content-Type":"application/json"}, json=body, timeout=60)
-        if not resp.ok:
-            st.sidebar.error(f"Gemini API lỗi: {resp.status_code} {resp.text[:250]}")
-            return
-        data = resp.json()
-        try:
-            answer = data["candidates"][0]["content"]["parts"][0]["text"]
-        except Exception:
-            answer = json.dumps(data)[:600]
-    except Exception as e:
-        st.sidebar.error(f"Lỗi gọi Gemini API: {e}")
-        return
-
-    # Cập nhật lịch sử + hiển thị
-    st.session_state.gem_history.append({"role":"user","text": user_question})
-    st.session_state.gem_history.append({"role":"assistant","text": answer})
-    st.sidebar.markdown("**🤖 Gemini:**")
-    st.sidebar.write(answer)
 
 st.markdown("""
 <style>
 :root { --label-color: #1f6feb; }
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
 }
 .info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
@@ -215,7 +108,6 @@ def info_card(label, value):
 
 # ==============================
 # Column mappings
-# ... (giữ nguyên COL_MAP)
 # ==============================
 
 COL_MAP = {
@@ -260,20 +152,9 @@ COL_MAP = {
     }
 }
 
-
 # ==============================
 # Sidebar (Upload + Filters)
 # ==============================
-
-# Khai báo/Khởi tạo các biến DataFrame ở phạm vi toàn cục
-df_docs = pd.DataFrame()
-df_over = pd.DataFrame()
-df_find = pd.DataFrame()
-df_act  = pd.DataFrame()
-f_df = pd.DataFrame()
-all_refs = []
-selected_refs = []
-
 
 with st.sidebar:
     st.header("📤 Tải dữ liệu")
@@ -284,14 +165,7 @@ st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
-    # --- [GEMINI CHAT] ---
-    st.sidebar.markdown("---")
-    # Lần gọi này sử dụng các DataFrame rỗng đã được khởi tạo
-    gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, True) 
-    # ---------------------
     st.stop()
-
-# --- CODE CHỈ CHẠY KHI CÓ FILE ĐƯỢC UPLOAD ---
 
 data = load_excel(uploaded)
 
@@ -308,10 +182,6 @@ df_act  = get_df("actions")
 
 if df_docs.empty or df_over.empty or df_find.empty:
     st.error("Thiếu một trong các sheet bắt buộc: documents, overalls, findings.")
-    # --- [GEMINI CHAT] ---
-    st.sidebar.markdown("---")
-    gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, True)
-    # ---------------------
     st.stop()
 
 # Dates
@@ -339,14 +209,8 @@ st.sidebar.markdown("---")
 st.sidebar.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
 st.sidebar.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
 
-# --- [GEMINI CHAT] ---
-# Lần gọi này sử dụng các DataFrame đã được điền dữ liệu
-gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, False)
-# ---------------------
-
 # ==============================
 # Tabs
-# ... (giữ nguyên nội dung các tabs)
 # ==============================
 
 tab_docs, tab_over, tab_find, tab_act = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions"])
@@ -505,92 +369,3 @@ with tab_act:
         st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
 
 st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
-
-
-# ==============================
-# GEMINI CHAT SIDEBAR LOGIC
-# ==============================
-
-def gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, no_data):
-    """Thêm khung chat Gemini vào sidebar."""
-    st.header("🤖 Trợ lý Gemini (Chat)")
-    
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.warning("Vui lòng thiết lập GEMINI_API_KEY trong file .streamlit/secrets.toml")
-        return
-
-    # Khởi tạo client Gemini
-    try:
-        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-    except Exception as e:
-        st.error(f"Lỗi khởi tạo Gemini Client: {e}")
-        return
-
-    # Khởi tạo lịch sử chat
-    if "gemini_chat_history" not in st.session_state:
-        # Hệ thống prompt ban đầu để cung cấp ngữ cảnh về ứng dụng
-        initial_prompt = (
-            "Bạn là một trợ lý phân tích dữ liệu chuyên nghiệp, am hiểu về các Kết luận Thanh tra (KLTT). "
-            "Người dùng đang xem Dashboard KLTT. "
-            "Hãy trả lời các câu hỏi liên quan đến phân tích dữ liệu, ý nghĩa của các chỉ số (nếu có dữ liệu) hoặc tư vấn về cách sử dụng dashboard. "
-            "Hạn chế đưa ra các câu trả lời quá dài. Nếu không biết, hãy nói rõ bạn không có thông tin."
-        )
-        # SỬA LỖI 404: Đổi tên mô hình sang 'gemini-2.5-flash' (hoặc 'gemini-pro')
-        st.session_state.gemini_chat_history = client.chats.create(
-            model="gemini-2.5-flash", 
-            system_instruction=initial_prompt
-        )
-
-    chat = st.session_state.gemini_chat_history
-
-    # Thêm thông tin ngữ cảnh dữ liệu hiện tại vào lịch sử chat (nhưng không hiển thị)
-    context_data = ""
-    if not no_data and not df_find.empty:
-        # Chỉ tính tổng nếu cột tồn tại và không rỗng
-        npl_total = df_over['npl_total_vnd'].sum() if 'npl_total_vnd' in df_over.columns and not df_over.empty else np.nan
-        quantified_amount = f_df['quantified_amount'].sum() if 'quantified_amount' in f_df.columns and not f_df.empty else np.nan
-        
-        context_data = (
-            "NGỮ CẢNH DỮ LIỆU HIỆN TẠI (Tóm tắt DataFrames đã tải):\n"
-            f"1. Documents: {len(df_docs)} báo cáo, các cột: {list(df_docs.columns)}\n"
-            f"2. Overalls: {len(df_over)} hàng, Tổng Nợ xấu: {format_vnd(npl_total)}\n"
-            f"3. Findings (đã lọc): {len(f_df)} phát hiện, Tổng tiền ảnh hưởng: {format_vnd(quantified_amount)}, "
-            f"Các Category chính: {f_df['category'].dropna().unique().tolist() if 'category' in f_df.columns and not f_df.empty else []}\n"
-            f"4. Actions: {len(df_act)} biện pháp (nếu có).\n"
-            "Hãy sử dụng thông tin này để đưa ra câu trả lời chính xác hơn về dữ liệu.\n"
-        )
-    else:
-        context_data = "KHÔNG CÓ DỮ LIỆU ĐƯỢC TẢI. Chỉ trả lời các câu hỏi chung về Dashboard."
-
-    # Lấy lịch sử tin nhắn từ session state (loại bỏ tin nhắn hệ thống)
-    display_messages = [
-        {"role": msg.role, "content": msg.parts[0].text} 
-        for msg in chat.get_history() 
-        if msg.role in ["user", "model"]
-    ]
-
-    # Hiển thị lịch sử chat
-    for message in display_messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Xử lý input người dùng
-    user_prompt = st.chat_input("Hỏi Gemini về dashboard hoặc dữ liệu...", key="gemini_chat_input")
-
-    if user_prompt:
-        # Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
-        with st.chat_message("user"):
-            st.markdown(user_prompt)
-
-        # Kết hợp ngữ cảnh dữ liệu vào prompt thực gửi đi
-        full_prompt = context_data + "\n" + user_prompt
-
-        # Gọi API Gemini
-        with st.chat_message("assistant"):
-            with st.spinner("Gemini đang suy nghĩ..."):
-                try:
-                    # Gửi tin nhắn đến mô hình chat
-                    response = chat.send_message(full_prompt)
-                    st.markdown(response.text)
-                except Exception as e:
-                    st.error(f"Lỗi khi gọi Gemini API: {e}. Vui lòng kiểm tra API Key và quyền truy cập.")
