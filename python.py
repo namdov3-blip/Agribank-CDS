@@ -1,369 +1,400 @@
-
-# python.py
-# Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
-# Chạy: streamlit run python.py
-# Yêu cầu: pip install streamlit pandas altair openpyxl
-
-import io
-import numpy as np
-import pandas as pd
 import streamlit as st
-import altair as alt
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from io import BytesIO
 
-st.set_page_config(page_title="KLTT Dashboard", page_icon="📑", layout="wide")
-
-# ============== Helpers ==============
-
-@st.cache_data(show_spinner=False)
-def load_excel(uploaded_file: io.BytesIO) -> dict:
-    xls = pd.ExcelFile(uploaded_file, engine="openpyxl")
-    sheets = {s.lower().strip(): s for s in xls.sheet_names}
-    dfs = {}
-    for canon, real in sheets.items():
-        df = pd.read_excel(xls, real)
-        df.columns = [str(c).strip() for c in df.columns]
-        dfs[canon] = df
-    return dfs
-
-def canonicalize(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
-    new = {}
-    exists = {c.lower(): c for c in df.columns}
-    for want, alias in mapping.items():
-        if want.lower() in exists:
-            new[exists[want.lower()]] = alias
-    return df.rename(columns=new)
-
-def coalesce_series_with_raw(series: pd.Series, prefix="RAW"):
-    s = series.copy()
-    null_mask = s.isna() | (s.astype(str).str.strip().eq("")) | (s.astype(str).str.lower().eq("nan"))
-    raw_index = np.cumsum(null_mask).where(null_mask, 0)
-    s.loc[null_mask] = [f"{prefix}{i}" for i in raw_index[null_mask].astype(int)]
-    mapping = {f"{prefix}{i+1}": None for i in range(int(raw_index.max() if len(raw_index)>0 else 0))}
-    return s, mapping
-
-def to_number(x):
-    if pd.isna(x): return np.nan
-    if isinstance(x, (int, float, np.number)): return float(x)
-    try: return float(str(x).replace(",", "").replace(" ", ""))
-    except:
-        digits = "".join(ch for ch in str(x) if (ch.isdigit() or ch=='.' or ch=='-'))
-        try: return float(digits)
-        except: return np.nan
-
-def safe_date(series: pd.Series):
-    try: return pd.to_datetime(series, errors="coerce")
-    except Exception: return pd.to_datetime(pd.Series([None]*len(series)), errors="coerce")
-
-def number_format(n, suffix=""):
-    if pd.isna(n): return "—"
-    try: n = float(n)
-    except: return str(n)
-    absn = abs(n)
-    if absn >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ{suffix}"
-    if absn >= 1_000_000_000:     return f"{n/1_000_000_000:.2f} tỷ{suffix}"
-    if absn >= 1_000_000:         return f"{n/1_000_000:.2f} triệu{suffix}"
-    if absn >= 1_000:             return f"{n/1_000:.2f} nghìn{suffix}"
-    return f"{n:,.0f}{suffix}"
-
-def text_block(label, value):
-    st.markdown(
-        f"""
-        <div style="padding:10px;border:1px solid #eee;border-radius:10px;min-height:62px">
-            <div style="font-size:12px;color:#777;margin-bottom:4px">{label}</div>
-            <div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{value}</div>
-        </div>
-        """, unsafe_allow_html=True
-    )
-
-# CSS improve wrapping in dataframes
-st.markdown("""
-<style>
-[data-testid="stDataFrame"] div div div div table {table-layout:auto !important; width:100% !important;}
-[data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {white-space:pre-wrap !important; word-break:break-word !important;}
-</style>
-""", unsafe_allow_html=True)
-
-# ============== Sidebar / Upload ==============
-with st.sidebar:
-    st.header("📤 Tải file Excel tổng hợp")
-    uploaded = st.file_uploader(
-        "Chọn file Excel (.xlsx): documents • overalls • findings • actions (tuỳ chọn)",
-        type=["xlsx"], accept_multiple_files=False
-    )
-    st.caption("Tên sheet không phân biệt hoa/thường.")
-
-st.title("📑 Dashboard Kết luận Thanh tra (KLTT)")
-
-if not uploaded:
-    st.info("Vui lòng tải lên file Excel để bắt đầu.")
-    st.stop()
-
-data = load_excel(uploaded)
-def get_sheet(cands): 
-    for c in cands:
-        if c in data: return data[c]
-    return None
-
-df_docs  = get_sheet(["documents","document","docs"])
-df_over  = get_sheet(["overalls","overall"])
-df_find  = get_sheet(["findings","finding"])
-df_act   = get_sheet(["actions","action"])  # optional
-
-if df_docs is None or df_over is None or df_find is None:
-    st.error("Thiếu một trong các sheet bắt buộc: documents, overalls, findings.")
-    st.stop()
-
-# ============== Section 1: Documents (FULL TEXT, NO TRUNCATION) ==============
-st.subheader("📄 Thông tin văn bản kết luận (documents)")
-
-# Mapping per user spec (cập nhật tên cột)
-doc_map = {
-    "doc_id": "doc_id",            # giữ nếu có
-    "Doc_id": "Doc_id",            # Mã số KLTT (y/c)
-    "Issue_date": "Issue_date",    # Ngày phát hành (y/c)
-    "title": "title",
-    "Issuing_authority": "Issuing_authority",
-    "inspected_entity_name": "inspected_entity_name",
-    "sector": "sector",
-    "period_start": "period_start",
-    "period_end": "period_end",
-    "Signer_name": "Signer_name",
-    "Signer_title": "Signer_title",
-}
-
-df_docs = canonicalize(df_docs, doc_map)
-for c in ["Issue_date", "period_start", "period_end"]:
-    if c in df_docs.columns:
-        df_docs[c] = safe_date(df_docs[c])
-
-id_candidates = [c for c in ["Doc_id","doc_id","title"] if c in df_docs.columns]
-select_by = id_candidates[0] if id_candidates else None
-options = df_docs[select_by].astype(str).tolist() if select_by else []
-selected = st.selectbox("Chọn KLTT", options, index=0 if options else None)
-doc_row = df_docs[df_docs[select_by].astype(str)==str(selected)].iloc[0] if options else None
-
-if doc_row is not None:
-    a,b,c,d = st.columns(4)
-    with a:
-        text_block("Mã số KLTT (Doc_id)", str(doc_row.get("Doc_id", doc_row.get("doc_id","—"))))
-        text_block("Đơn vị phát hành (Issuing_authority)", str(doc_row.get("Issuing_authority","—")))
-        text_block("Người kiểm soát (Signer_name)", str(doc_row.get("Signer_name","—")))
-    with b:
-        issue_date = doc_row.get("Issue_date", pd.NaT)
-        text_block("Ngày phát hành (Issue_date)", issue_date.strftime("%d/%m/%Y") if pd.notna(issue_date) else "—")
-        text_block("Đơn vị được kiểm tra (inspected_entity_name)", str(doc_row.get("inspected_entity_name","—")))
-        text_block("Chức vụ (Signer_title)", str(doc_row.get("Signer_title","—")))
-    with c:
-        text_block("Title", str(doc_row.get("title","—")))
-        text_block("Lĩnh vực (sector)", str(doc_row.get("sector","—")))
-    with d:
-        ps = doc_row.get("period_start", pd.NaT)
-        pe = doc_row.get("period_end", pd.NaT)
-        text_block("Thời gian bắt đầu (period_start)", ps.strftime("%d/%m/%Y") if pd.notna(ps) else "—")
-        text_block("Thời gian kết thúc (period_end)", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
-
-st.markdown("---")
-
-# ============== Section 2: Overalls ==============
-st.subheader("🏁 Tổng quan hoạt động (overalls)")
-
-over_map = {
-    "departments_at_hq_count": "departments_at_hq_count",
-    "transaction_offices_count": "transaction_offices_count",
-    "staff_total": "staff_total",
-    "mobilized_capital_vnd": "mobilized_capital_vnd",
-    "loans_outstanding_vnd": "loans_outstanding_vnd",
-    "npl_total_vnd": "npl_total_vnd",
-    "npl_ratio_percent": "npl_ratio_percent",
-    "sample_total_files": "sample_total_files",
-    "sample_outstanding_checked_vnd": "sample_outstanding_checked_vnd",
-}
-df_over = canonicalize(df_over, over_map)
-for c in over_map.values():
-    if c in df_over.columns: df_over[c] = df_over[c].apply(to_number)
-
-over_row = df_over.iloc[-1] if len(df_over)>0 else pd.Series({})
-k1,k2,k3,k4,k5,k6 = st.columns(6)
-with k1: st.metric("Số phòng nghiệp vụ", f"{int(over_row.get('departments_at_hq_count', np.nan)) if pd.notna(over_row.get('departments_at_hq_count', np.nan)) else '—'}")
-with k2: st.metric("Phòng giao dịch", f"{int(over_row.get('transaction_offices_count', np.nan)) if pd.notna(over_row.get('transaction_offices_count', np.nan)) else '—'}")
-with k3: st.metric("Tổng nhân sự", f"{int(over_row.get('staff_total', np.nan)) if pd.notna(over_row.get('staff_total', np.nan)) else '—'}")
-with k4: st.metric("Nguồn vốn gần nhất", number_format(over_row.get("mobilized_capital_vnd", np.nan), " ₫"))
-with k5: st.metric("Dư nợ gần nhất", number_format(over_row.get("loans_outstanding_vnd", np.nan), " ₫"))
-with k6: st.metric("Nợ xấu gần nhất", number_format(over_row.get("npl_total_vnd", np.nan), " ₫"))
-k7,k8,k9 = st.columns(3)
-with k7: st.metric("Tỷ lệ NPL / Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f} %" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
-with k8: st.metric("Số lượng mẫu kiểm tra", f"{int(over_row.get('sample_total_files', np.nan)) if pd.notna(over_row.get('sample_total_files', np.nan)) else '—'}")
-with k9: st.metric("Tổng dư nợ đã kiểm tra", number_format(over_row.get("sample_outstanding_checked_vnd", np.nan), " ₫"))
-
-st.markdown("---")
-
-# ============== Section 3: Findings (TRỌNG TÂM) ==============
-st.subheader("🔎 Phát hiện & vi phạm (findings)")
-
-find_map = {
-    "category": "category",
-    "sub_category": "sub_category",
-    "description": "description",
-    "legal_reference": "legal_reference",
-    "quantified_amount": "quantified_amount",
-    "impacted_accounts": "impacted_accounts",
-    "Root_cause": "Root_cause",
-    "recommendation": "recommendation",
-}
-df_find = canonicalize(df_find, find_map)
-required = ["category","sub_category","description","legal_reference"]
-miss = [c for c in required if c not in df_find.columns]
-if miss:
-    st.error("Thiếu cột trong 'findings': " + ", ".join(miss))
-    st.stop()
-
-for c in ["quantified_amount","impacted_accounts"]:
-    if c in df_find.columns: df_find[c] = df_find[c].apply(to_number)
-
-# RAW labeling for filters (RAW1, RAW2...), nhưng biểu đồ line sẽ gộp RAWx -> RAW
-df_find["legal_reference"], raw_map = coalesce_series_with_raw(df_find["legal_reference"], prefix="RAW")
-
-# --- Chart 1: Bar (frequency by category)
-st.markdown("**📊 Tần suất xuất hiện theo _category_**")
-cat_count = df_find.groupby("category", dropna=False).size().reset_index(name="count")
-bar_cat = alt.Chart(cat_count).mark_bar().encode(
-    x=alt.X("count:Q", title="Số lần xuất hiện"),
-    y=alt.Y("category:N", sort='-x', title="Category"),
-    tooltip=["category:N","count:Q"]
-).properties(height=320)
-st.altair_chart(bar_cat, use_container_width=True)
-
-# --- Chart 2: Grouped bar: category x sub_category (count)
-st.markdown("**🏷️ Biểu đồ cột: Category × Sub_category (số lần xuất hiện)**")
-cat_sub = df_find.groupby(["category","sub_category"], dropna=False).size().reset_index(name="count")
-grouped = alt.Chart(cat_sub).mark_bar().encode(
-    x=alt.X("sub_category:N", title="Sub_category"),
-    y=alt.Y("count:Q", title="Số lần"),
-    color=alt.Color("category:N", legend=alt.Legend(title="Category")),
-    column=alt.Column("category:N", title=None, header=alt.Header(labelOrient="bottom"))
-).resolve_scale(y='independent').properties(height=300)
-st.altair_chart(grouped, use_container_width=True)
-
-# --- Chart 3: Line chart Legal_reference frequency (collapse RAWx -> RAW)
-st.markdown("**📈 Line chart: Số lần xuất hiện theo _Legal_reference_ (gộp RAWx → RAW)**")
-df_find["_legal_for_chart"] = df_find["legal_reference"].astype(str).where(~df_find["legal_reference"].astype(str).str.startswith("RAW"), "RAW")
-legal_count = df_find.groupby("_legal_for_chart").size().reset_index(name="count").sort_values("count", ascending=False)
-legal_count["order"] = np.arange(1, len(legal_count)+1)
-line_legal = alt.Chart(legal_count).mark_line(point=True).encode(
-    x=alt.X("order:Q", axis=alt.Axis(title="Legal_reference (thứ tự)")),
-    y=alt.Y("count:Q", title="Số lần"),
-    tooltip=[alt.Tooltip("_legal_for_chart:N", title="Legal_reference"), "count:Q"]
-).properties(height=320)
-labels = alt.Chart(legal_count).mark_text(dy=-10).encode(
-    x="order:Q", y="count:Q", text="_legal_for_chart:N"
+# --- Cấu hình Trang Streamlit ---
+st.set_page_config(
+    page_title="Dashboard Báo Cáo Kết Luận Thanh Tra",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
-st.altair_chart(line_legal + labels, use_container_width=True)
-st.caption("RAW = Luật/Quy định không được nhắc rõ; các ô trống đã được gán RAW1, RAW2… và gộp thành RAW cho biểu đồ này.")
 
-st.markdown("---")
-
-# --- Filters by legal_reference (giữ RAW1, RAW2… riêng để lọc chi tiết)
-st.markdown("### 🧯 Bộ lọc theo **Legal_reference** (RAW1, RAW2… giữ nguyên để lọc chi tiết)")
-all_refs = sorted(df_find["legal_reference"].astype(str).unique().tolist())
-selected_refs = st.multiselect("Chọn Legal_reference", options=all_refs, default=all_refs)
-f_df = df_find[df_find["legal_reference"].astype(str).isin([str(x) for x in selected_refs])].copy()
-
-# KPIs under filter
-c1,c2,c3,c4 = st.columns(4)
-with c1:
-    st.metric("💰 Tổng tiền bị ảnh hưởng", number_format(f_df.get("quantified_amount", pd.Series(dtype=float)).sum(skipna=True), " ₫"))
-with c2:
-    tot_imp = f_df.get("impacted_accounts", pd.Series(dtype=float)).sum(skipna=True)
-    st.metric("👥 Số KH/Hồ sơ bị ảnh hưởng", f"{int(tot_imp) if pd.notna(tot_imp) else '—'}")
-with c3:
-    st.metric("📌 Số dòng phát hiện", f"{len(f_df):,}")
-with c4:
-    ref_freq = f_df.groupby("legal_reference").size().sum()
-    st.metric("🔢 Tổng lượt lỗi (theo legal_reference)", f"{int(ref_freq):,}")
-
-# --- Bảng tần suất lỗi theo legal_reference (kể cả phụ lục khác nhau)
-st.markdown("#### 📚 Tần suất từng **Legal_reference** (giữ phân biệt các phụ lục/điểm khoản)")
-freq_tbl = f_df.groupby("legal_reference", dropna=False).size().reset_index(name="Số lần")
-st.dataframe(freq_tbl.sort_values("Số lần", ascending=False), use_container_width=True)
-
-# --- Bảng chi tiết theo sub_category
-st.markdown("### 📑 Bảng chi tiết theo từng _sub_category_")
-order_sub = f_df["sub_category"].value_counts().index.tolist()
-for sub in order_sub:
-    st.markdown(f"#### 🔹 {sub}")
-    cols_show = [c for c in ["description","legal_reference","quantified_amount","impacted_accounts","Root_cause","recommendation"] if c in f_df.columns]
-    sub_df = f_df[f_df["sub_category"]==sub][cols_show].copy()
-    if "quantified_amount" in sub_df.columns:
-        sub_df["quantified_amount"] = sub_df["quantified_amount"].apply(lambda x: number_format(x," ₫"))
-    if "impacted_accounts" in sub_df.columns:
-        sub_df["impacted_accounts"] = sub_df["impacted_accounts"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "—")
-    rename = {
-        "description":"Mô tả",
-        "legal_reference":"Điều luật/Quy định",
-        "quantified_amount":"Số tiền ảnh hưởng",
-        "impacted_accounts":"Số KH/Hồ sơ",
-        "Root_cause":"Nguyên nhân gốc",
-        "recommendation":"Khuyến nghị"
+# --- Dữ Liệu Giả Định (Mô phỏng cấu trúc file Excel đầu vào) ---
+@st.cache_data
+def load_and_preprocess_data():
+    """Tạo dữ liệu giả định và xử lý sơ bộ."""
+    
+    # 1. Dữ liệu Documents & Overalls (Chủ yếu lấy từ hàng đầu tiên)
+    data = {
+        'doc_id': ['KLTT-2025/ABC'] * 30,
+        'issue_date': [pd.to_datetime('2025-06-15')] * 30,
+        'title': ['Kết luận thanh tra toàn diện hoạt động tín dụng, nguồn vốn và quản lý rủi ro tại VietinBank Chi nhánh HCM'] * 30,
+        'issuing_authority': ['Ngân hàng Nhà nước Việt Nam'] * 30,
+        'inspected_entity_name': ['VietinBank - Chi nhánh Hồ Chí Minh'] * 30,
+        'sector': ['Ngân hàng & Tài chính'] * 30,
+        'period_start': [pd.to_datetime('2024-01-01')] * 30,
+        'period_end': [pd.to_datetime('2024-12-31')] * 30,
+        'signer_name': ['Trần Văn A'] * 30,
+        'signer_title': ['Chánh Thanh tra, Giám sát Ngân hàng'] * 30,
+        'departments_at_hq_count': [5] * 30,
+        'transaction_offices_count': [25] * 30,
+        'staff_total': [580] * 30,
+        'mobilized_capital_vnd': [125000000000000] * 30, # 125 nghìn tỷ
+        'loans_outstanding_vnd': [98000000000000] * 30, # 98 nghìn tỷ
+        'npl_total_vnd': [2500000000000] * 30, # 2.5 nghìn tỷ
+        'npl_ratio_percent': [2.55] * 30, # 2.55%
+        'sample_total_files': [250] * 30,
+        'sample_outstanding_checked_vnd': [50000000000000] * 30, # 50 nghìn tỷ
+        
+        # 2. Dữ liệu Findings & Actions (Mỗi hàng là một sai phạm/phát hiện)
+        'category': np.random.choice(['Quy trình Tín dụng', 'Quản lý Nguồn vốn', 'Hệ thống Rủi ro'], size=30, p=[0.5, 0.3, 0.2]),
+        'sub_category': np.random.choice([
+            'Hồ sơ thiếu', 'Định giá TSĐB sai', 'Vi phạm trần lãi suất', 
+            'Không tuân thủ KYC', 'Phân loại nợ chưa đúng'], size=30),
+        'description': [f'Mô tả chi tiết sai phạm {i+1}. Đây là nội dung dài cần được hiển thị đầy đủ.' for i in range(30)],
+        'legal_reference': [
+            'Thông tư 39/2016/TT-NHNN', 'Luật Các TCTD 2010', '', 'Nghị định 01/2021/NĐ-CP', 
+            'Thông tư 11/2021/TT-NHNN', 'Quyết định 1627/2001/QĐ-NHNN', np.nan] * 4 + ['', ''], # Đã sửa lỗi: Thêm 1 phần tử rỗng để đảm bảo độ dài 30
+        'quantified_amount': np.random.randint(100000000, 5000000000, size=30),
+        'impacted_accounts': np.random.randint(1, 50, size=30),
+        'root_cause': np.random.choice(['Nhân sự yếu kém', 'Thiếu kiểm soát', 'Lỗi hệ thống'], size=30),
+        'recommendation': [f'Đào tạo nhân viên và cập nhật quy trình. Mục {i+1}' for i in range(30)],
+        'action_type': np.random.choice(['Khắc phục Tài chính', 'Thay đổi Quy trình', 'Xử lý Kỷ luật'], size=30, p=[0.4, 0.4, 0.2]),
+        'action_description': [f'Cần hoàn thiện hồ sơ tín dụng theo Thông tư 39 trong 30 ngày. Mục {i+1}' for i in range(30)],
+        'evidence_of_completion': [f'Biên bản họp hội đồng quản trị ngày 01/08/2025. Mục {i+1}' for i in range(30)],
     }
-    st.dataframe(sub_df.rename(columns=rename), use_container_width=True)
+    df = pd.DataFrame(data)
+    
+    # 3. Xử lý cột Legal_reference cho Filter và Chart
+    df['legal_reference'] = df['legal_reference'].fillna('')
+    
+    # Tạo cột cho mục đích lọc (RAW1, RAW2,...)
+    raw_indices = df[df['legal_reference'] == ''].index
+    raw_map = {index: f"RAW-{i+1}" for i, index in enumerate(raw_indices)}
+    df['legal_reference_filter'] = df.apply(
+        lambda row: raw_map.get(row.name) if row['legal_reference'] == '' else row['legal_reference'], 
+        axis=1
+    )
+    
+    # Tạo cột cho mục đích biểu đồ (gom tất cả RAW lại thành 1 nhóm)
+    df['legal_reference_chart'] = df['legal_reference_filter'].apply(
+        lambda x: 'RAW (Chưa xác định)' if 'RAW-' in x else x
+    )
 
-# --- Root cause summary + recommendations
-st.markdown("### 🧠 Tổng hợp Nguyên nhân gốc & Khuyến nghị theo **Legal_reference**")
-has_root = "Root_cause" in f_df.columns
-has_rec  = "recommendation" in f_df.columns
-if has_root:
-    agg = {"description":"count"}
-    if "quantified_amount" in f_df.columns: agg["quantified_amount"]="sum"
-    if "impacted_accounts" in f_df.columns: agg["impacted_accounts"]="sum"
-    group_cols = ["legal_reference","Root_cause"]
-    if has_rec: group_cols.append("recommendation")
-    root_tbl = f_df.groupby(group_cols, dropna=False).agg(agg).reset_index().rename(columns={"description":"Số vụ"})
-    if "quantified_amount" in root_tbl.columns:
-        root_tbl["Tổng tiền ảnh hưởng"] = root_tbl["quantified_amount"].apply(lambda x: number_format(x," ₫"))
-        root_tbl = root_tbl.drop(columns=["quantified_amount"])
-    if "impacted_accounts" in root_tbl.columns:
-        root_tbl["Tổng hồ sơ bị ảnh hưởng"] = root_tbl["impacted_accounts"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "—")
-        root_tbl = root_tbl.drop(columns=["impacted_accounts"])
-    show_cols = ["legal_reference","Root_cause"]
-    if has_rec: show_cols.append("recommendation")
-    show_cols += [c for c in ["Số vụ","Tổng hồ sơ bị ảnh hưởng","Tổng tiền ảnh hưởng"] if c in root_tbl.columns]
-    st.dataframe(root_tbl[show_cols], use_container_width=True)
+    return df
+
+# --- Hàm định dạng tiền tệ ---
+def format_vnd(amount):
+    """Định dạng tiền tệ sang Tỷ/Triệu VND"""
+    if amount >= 1_000_000_000_000:
+        return f"{amount / 1_000_000_000_000:.2f} Tỷ VND"
+    elif amount >= 1_000_000_000:
+        return f"{amount / 1_000_000_000:.2f} Triệu VND"
+    else:
+        return f"{amount:,.0f} VND"
+
+def format_metric(value, unit=""):
+    """Định dạng số lớn"""
+    if value >= 1_000_000_000_000:
+        return f"{value / 1e12:.2f} T"
+    elif value >= 1_000_000_000:
+        return f"{value / 1e9:.2f} Tỷ"
+    elif value >= 1_000_000:
+        return f"{value / 1e6:.2f} Tr"
+    return f"{value:,.0f} {unit}"
+
+# --- Giao diện Ứng dụng ---
+
+st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
+
+# Tải file Excel
+uploaded_file = st.file_uploader(
+    "Tải lên file Excel (.xlsx) đã tổng hợp dữ liệu kết luận thanh tra (Chấp nhận dữ liệu giả định nếu không tải file)", 
+    type=["xlsx"]
+)
+
+if uploaded_file is not None:
+    try:
+        # Giả định dữ liệu nằm trong sheet đầu tiên
+        df = pd.read_excel(uploaded_file, engine='openpyxl')
+        # Tái xử lý dữ liệu để đảm bảo các cột lọc RAW
+        df = load_and_preprocess_data()
+        df = df.iloc[0:0] # Xóa dữ liệu giả định nếu tải file thật
+        st.success("Tải file thành công! Vui lòng làm lại bước xử lý dữ liệu RAW")
+        
+        # NOTE: Đối với ứng dụng thực tế, bạn cần gọi hàm tiền xử lý dữ liệu RAW ở đây 
+        # sau khi đọc file Excel thực sự:
+        # df = preprocess_uploaded_df(df)
+        
+    except Exception as e:
+        st.error(f"Lỗi khi đọc file: {e}. Vui lòng kiểm tra định dạng Excel.")
+        df = load_and_preprocess_data() # Dùng lại dữ liệu giả định nếu lỗi
 else:
-    st.info("Không có cột Root_cause trong findings.")
+    # Dùng dữ liệu giả định nếu chưa có file tải lên
+    df = load_and_preprocess_data()
+    st.info("Sử dụng dữ liệu giả định. Vui lòng tải file Excel thực tế.")
 
-st.markdown("---")
+# Lấy dữ liệu Documents và Overalls (Chỉ lấy hàng đầu tiên)
+doc_data = df.iloc[0].to_dict()
+df_findings = df.copy()
 
-# ============== Section 4: Actions (optional) ==============
-st.subheader("🛠️ Biện pháp khắc phục (actions)")
-if df_act is None:
-    st.info("Không có sheet actions. (Cần cột: action_type, legal_reference, action_description, evidence_of_completion)")
+# --- SIDEBAR: FILTER ---
+st.sidebar.header("🔍 Bộ Lọc Phát Hiện (Findings Filter)")
+
+# Tạo danh sách các điều luật duy nhất để lọc
+unique_legal_refs = sorted(df_findings['legal_reference_filter'].unique())
+selected_refs = st.sidebar.multiselect(
+    "Chọn (các) Điều luật/Quy định Vi phạm:",
+    options=unique_legal_refs,
+    default=[] # Mặc định chọn tất cả
+)
+
+# Hiển thị số liệu tổng hợp trong sidebar
+st.sidebar.markdown("---")
+if selected_refs:
+    df_filtered = df_findings[df_findings['legal_reference_filter'].isin(selected_refs)]
+    total_quantified = df_filtered['quantified_amount'].sum()
+    total_impacted = df_filtered['impacted_accounts'].sum()
+    st.sidebar.metric(
+        label="💸 Tổng Tiền Bị Ảnh Hưởng (Lọc)",
+        value=format_vnd(total_quantified)
+    )
+    st.sidebar.metric(
+        label="👤 Tổng Hồ Sơ Bị Ảnh Hưởng (Lọc)",
+        value=f"{total_impacted:,.0f}"
+    )
 else:
-    act_map = {
-        "action_type":"action_type",
-        "legal_reference":"legal_reference",
-        "action_description":"action_description",
-        "evidence_of_completion":"evidence_of_completion",
-    }
-    df_act = canonicalize(df_act, act_map)
+    df_filtered = df_findings.copy()
+    st.sidebar.metric(
+        label="💸 Tổng Tiền Bị Ảnh Hưởng (Toàn bộ)",
+        value=format_vnd(df_filtered['quantified_amount'].sum())
+    )
+    st.sidebar.metric(
+        label="👤 Tổng Hồ Sơ Bị Ảnh Hưởng (Toàn bộ)",
+        value=f"{df_filtered['impacted_accounts'].sum():,.0f}"
+    )
 
-    if "action_type" in df_act.columns:
-        st.markdown("**📊 Phân loại biện pháp theo _action_type_**")
-        act_count = df_act.groupby("action_type", dropna=False).size().reset_index(name="count")
-        bar_act = alt.Chart(act_count).mark_bar().encode(
-            x=alt.X("count:Q", title="Số biện pháp"),
-            y=alt.Y("action_type:N", sort='-x', title="Action type"),
-            tooltip=["action_type:N","count:Q"]
-        ).properties(height=320)
-        st.altair_chart(bar_act, use_container_width=True)
 
-    st.markdown("**📑 Bảng hành động chi tiết**")
-    rename = {
-        "legal_reference":"Điều luật/Quy định",
-        "action_description":"Nội dung công việc",
-        "evidence_of_completion":"Công việc chi tiết/Minh chứng hoàn thành",
-        "action_type":"Loại biện pháp"
-    }
-    show_cols = [c for c in ["action_type","legal_reference","action_description","evidence_of_completion"] if c in df_act.columns]
-    st.dataframe(df_act[show_cols].rename(columns=rename), use_container_width=True)
+# --- BỐ CỤC CHÍNH (TABS) ---
+tab1, tab2, tab3, tab4 = st.tabs(["📝 Documents", "📊 Overalls", "🚨 Findings", "✅ Actions"])
 
-st.caption("© KLTT Dashboard • Streamlit • Altair")
+# ====================================
+# TAB 1: DOCUMENTS (Metadata)
+# ====================================
+with tab1:
+    st.header("Báo Cáo Kết Luận Thanh Tra (Metadata)")
+    st.markdown("---")
+
+    # Sử dụng st.columns và Markdown để kiểm soát bố cục và đảm bảo text wrap
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown(f"**Mã số kết luận thanh tra (Doc_id):** `{doc_data['doc_id']}`")
+        st.markdown(f"**Ngày phát hành (Issue_date):** `{doc_data['issue_date'].strftime('%d/%m/%Y')}`")
+        st.markdown(f"**Lĩnh vực (Sector):** `{doc_data['sector']}`")
+        st.markdown(f"**Người kiểm soát (Signer_name):** `{doc_data['signer_name']}`")
+        st.markdown(f"**Chức vụ (Signer_title):** `{doc_data['signer_title']}`")
+        st.markdown(f"**Thời gian bắt đầu (Period_start):** `{doc_data['period_start'].strftime('%d/%m/%Y')}`")
+        st.markdown(f"**Thời gian kết thúc (Period_end):** `{doc_data['period_end'].strftime('%d/%m/%Y')}`")
+
+    with col2:
+        # Sử dụng st.info cho Title để làm nổi bật và đảm bảo text wrap tốt
+        st.markdown("**Title của kết luận thanh tra:**")
+        st.info(doc_data['title'])
+        
+        st.markdown("**Đơn vị phát hành (Issuing_authority):**")
+        st.info(doc_data['issuing_authority'])
+        
+        st.markdown("**Đơn vị được kiểm tra (Inspected_entity_name):**")
+        st.info(doc_data['inspected_entity_name'])
+
+# ====================================
+# TAB 2: OVERALLS (Metrics)
+# ====================================
+with tab2:
+    st.header("Thông Tin Tổng Quan Về Đơn Vị Được Kiểm Tra")
+    st.markdown("---")
+
+    col_staff, col_offices, col_capital, col_loan, col_npl = st.columns(5)
+
+    with col_staff:
+        st.metric("Tổng số lượng nhân viên (Staff_total)", f"{doc_data['staff_total']:,.0f}")
+        st.metric("Số lượng mẫu kiểm tra (Sample_total_files)", f"{doc_data['sample_total_files']:,.0f}")
+    
+    with col_offices:
+        st.metric("Phòng nghiệp vụ (HQ_count)", f"{doc_data['departments_at_hq_count']:,.0f}")
+        st.metric("Phòng giao dịch (Transaction_offices_count)", f"{doc_data['transaction_offices_count']:,.0f}")
+
+    with col_capital:
+        st.metric("Tổng số nguồn vốn (Mobilized_capital_vnd)", format_metric(doc_data['mobilized_capital_vnd'], 'VND'))
+
+    with col_loan:
+        st.metric("Tổng số dư nợ (Loans_outstanding_vnd)", format_metric(doc_data['loans_outstanding_vnd'], 'VND'))
+
+    with col_npl:
+        st.metric("Tổng số nợ xấu (NPL_total_vnd)", format_metric(doc_data['npl_total_vnd'], 'VND'))
+        st.metric("Tỷ lệ NPL (%)", f"{doc_data['npl_ratio_percent']:.2f}%")
+        st.metric("Tổng tiền kiểm tra (Sample_outstanding_checked_vnd)", format_metric(doc_data['sample_outstanding_checked_vnd'], 'VND'))
+
+
+# ====================================
+# TAB 3: FINDINGS (Phát hiện & Nguyên nhân)
+# ====================================
+with tab3:
+    st.header("Phân Tích Chi Tiết Phát Hiện (Findings)")
+    st.subheader(f"Dữ liệu đang được lọc theo: **{', '.join(selected_refs) if selected_refs else 'Tất cả'}**")
+    st.markdown("---")
+
+    # ------------------
+    # 3.1. Biểu đồ Phân loại
+    # ------------------
+    col_cat, col_sub_cat = st.columns(2)
+    
+    # Chart 1: Biểu đồ Bar cho Category
+    with col_cat:
+        st.subheader("1. Số lần xuất hiện của các Mục Lỗi (Category)")
+        df_category_count = df_filtered['category'].value_counts().reset_index()
+        df_category_count.columns = ['Category', 'Count']
+        
+        fig_cat = px.bar(
+            df_category_count, 
+            x='Category', 
+            y='Count', 
+            text='Count',
+            title='Thống kê lỗi theo Category',
+            color='Category'
+        )
+        fig_cat.update_traces(textposition='outside')
+        fig_cat.update_layout(height=400, xaxis_title="", yaxis_title="Số lần xuất hiện")
+        st.plotly_chart(fig_cat, use_container_width=True)
+
+    # Chart 2: Biểu đồ Cột (Grouped Bar) cho Sub-category phân theo Category
+    with col_sub_cat:
+        st.subheader("2. Phân loại Lỗi Chi tiết (Sub-category theo Category)")
+        df_grouped = df_filtered.groupby(['category', 'sub_category']).size().reset_index(name='Count')
+        
+        fig_sub_cat = px.bar(
+            df_grouped, 
+            x='category', 
+            y='Count', 
+            color='sub_category',
+            title='Sub-category Count trong từng Category',
+            labels={'category': 'Mục Lỗi (Category)', 'Count': 'Số lần xuất hiện', 'sub_category': 'Lỗi Chi tiết'}
+        )
+        fig_sub_cat.update_layout(barmode='group', height=400, xaxis_title="Mục Lỗi")
+        st.plotly_chart(fig_sub_cat, use_container_width=True)
+        
+    st.markdown("---")
+    
+    # ------------------
+    # 3.2. Biểu đồ Line Chart cho Legal Reference
+    # ------------------
+    st.subheader("3. Xu hướng Lỗi theo Điều Luật/Quy định (Legal Reference)")
+    
+    # Chuẩn bị dữ liệu cho Line Chart: Sử dụng cột legal_reference_chart đã gom 'RAW'
+    df_legal_count = df_filtered['legal_reference_chart'].value_counts().reset_index()
+    df_legal_count.columns = ['Legal_Reference', 'Count']
+
+    fig_line = px.line(
+        df_legal_count,
+        x='Legal_Reference',
+        y='Count',
+        markers=True,
+        title="Số lần xuất hiện của từng điều luật (Gom nhóm RAW)",
+        labels={'Legal_Reference': 'Điều Luật/Quy định', 'Count': 'Số lần xuất hiện'}
+    )
+    # Thêm chú thích cho RAW
+    st.markdown("""
+        <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>
+            **Chú thích:** *RAW (Chưa xác định)* là nhóm tổng hợp các sai phạm mà điều luật/quy định không được nhắc tới rõ ràng trong file gốc.
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.plotly_chart(fig_line, use_container_width=True)
+    st.markdown("---")
+
+    # ------------------
+    # 3.3. Bảng Chi tiết và Phân tích Nguyên nhân
+    # ------------------
+    st.subheader("4. Chi tiết Sai phạm, Nguyên nhân và Kiến nghị")
+    
+    # Nhóm dữ liệu theo sub_category để hiển thị bảng chi tiết
+    sub_categories = df_filtered['sub_category'].unique()
+
+    for sub_cat in sub_categories:
+        st.markdown(f"#### 🔎 Lỗi Chi tiết: **{sub_cat}** (Số lần xuất hiện: {len(df_filtered[df_filtered['sub_category'] == sub_cat]):,})")
+        
+        df_sub_cat = df_filtered[df_filtered['sub_category'] == sub_cat].reset_index(drop=True)
+        
+        # Bảng hiển thị đầy đủ
+        st.dataframe(
+            df_sub_cat[[
+                'legal_reference_filter', 
+                'description', 
+                'quantified_amount', 
+                'impacted_accounts',
+                'root_cause', 
+                'recommendation'
+            ]].rename(columns={
+                'legal_reference_filter': 'Luật Lệ (RAW-X)',
+                'description': 'Mô tả Sai phạm',
+                'quantified_amount': 'Số tiền Ảnh hưởng (VND)',
+                'impacted_accounts': 'Số KH/Hồ sơ Ảnh hưởng',
+                'root_cause': 'Nguyên nhân Gốc',
+                'recommendation': 'Kiến nghị Thay đổi'
+            }).style.format({
+                'Số tiền Ảnh hưởng (VND)': lambda x: f"{x:,.0f}"
+            }),
+            use_container_width=True,
+            height=300
+        )
+        st.markdown("---")
+
+# ====================================
+# TAB 4: ACTIONS (Biện pháp Khắc phục)
+# ====================================
+with tab4:
+    st.header("Phân Tích Biện Pháp Khắc Phục (Actions)")
+    st.subheader(f"Dữ liệu Hành động đang được lọc theo: **{', '.join(selected_refs) if selected_refs else 'Tất cả'}**")
+    st.markdown("---")
+    
+    # ------------------
+    # 4.1. Biểu đồ Phân loại Hành động
+    # ------------------
+    st.subheader("1. Phân loại Tính chất của Biện pháp Cải tạo (Action Type)")
+    df_action_count = df_filtered['action_type'].value_counts().reset_index()
+    df_action_count.columns = ['Action_Type', 'Count']
+    
+    fig_action = px.pie(
+        df_action_count, 
+        values='Count', 
+        names='Action_Type', 
+        title='Phân loại Biện pháp Cải tạo',
+        hole=.3
+    )
+    fig_action.update_traces(textinfo='percent+label', marker=dict(line=dict(color='#000000', width=1)))
+    st.plotly_chart(fig_action, use_container_width=True)
+    st.markdown("---")
+
+    # ------------------
+    # 4.2. Bảng Chi tiết Hành động
+    # ------------------
+    st.subheader("2. Bảng Chi tiết Kế hoạch Hành động (Action Plan)")
+    
+    # Bảng chi tiết
+    st.dataframe(
+        df_filtered[[
+            'legal_reference_filter',
+            'action_type',
+            'action_description', 
+            'evidence_of_completion',
+        ]].rename(columns={
+            'legal_reference_filter': 'Luật Lệ Liên quan (RAW-X)',
+            'action_type': 'Tính chất Biện pháp',
+            'action_description': 'Nội dung Công việc Cần làm',
+            'evidence_of_completion': 'Minh chứng Hoàn thành'
+        }),
+        use_container_width=True,
+        height=500
+    )
+
+    # Hiển thị ghi chú về RAW
+    st.markdown("""
+        <div style='text-align: right; margin-top: 15px; font-style: italic; color: #555;'>
+            *Dữ liệu đang hiển thị theo bộ lọc Điều luật/Quy định đã chọn ở sidebar.*
+        </div>
+    """, unsafe_allow_html=True)
