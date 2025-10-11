@@ -408,8 +408,8 @@ with tab_over:
     st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
         ("DN Nhà nước", "strucuture_econ_state_vnd"),
-        ("DN ngoài QD", "strucuture_econ_nonstate_enterprises_vnd"),
-        ("Cá nhân/Hộ gia đình", "strucuture_econ_individuals_households_vnd"),
+        ("DN tổ chức kinh tế", "structure_econ_nonstate_enterprises_vnd"),
+        ("DN tư nhân cá thể", "structure_econ_individuals_households_vnd"),
     ]
     eco_data = []
     for n, c in eco_items:
