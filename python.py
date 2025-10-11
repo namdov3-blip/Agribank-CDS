@@ -1,7 +1,7 @@
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
-# Yêu cầu: pip install streamlit pandas altair openpyxl plotly (Cần thêm google-genai để tích hợp Gemini API thực tế)
+# Yêu cầu: pip install streamlit pandas altair openpyxl plotly requests (Cần thêm google-genai để tích hợp Gemini API thực tế)
 
 import io
 import numpy as np
@@ -9,7 +9,10 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-# import requests # ĐÃ LOẠI BỎ: Không còn sử dụng n8n Webhook
+import requests # ĐÃ THÊM LẠI: Cho RAG Webhook
+# Thêm thư viện Google GenAI
+from google import genai
+from google.genai import types
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -157,7 +160,96 @@ def info_card(label, value):
     )
 
 # ==========================================================
-# GEMINI CHAT LOGIC (THAY THẾ RAG CHAT LOGIC)
+# RAG CHAT LOGIC (KHÔI PHỤC LOGIC GỌI N8N WEBHOOK)
+# ==========================================================
+
+def call_rag_api(prompt: str):
+    """Gọi n8n Webhook để giao tiếp với RAG Chatbot."""
+    if "N8N_WEBHOOK_URL" not in st.secrets:
+        return "**[LỖI CẤU HÌNH]** Vui lòng thiết lập N8N_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot RAG."
+
+    webhook_url = st.secrets["N8N_WEBHOOK_URL"]
+
+    try:
+        response = requests.post(webhook_url, json={"chatInput": prompt}, timeout=120)
+        response.raise_for_status()
+        
+        # Giả định n8n trả về text trong body
+        return response.text.strip()
+        
+    except requests.exceptions.HTTPError as e:
+        return f"**[LỖI HTTP]** Lỗi khi gọi n8n: {e}. Phản hồi: {response.text if 'response' in locals() else 'Không có phản hồi'}"
+    except requests.exceptions.RequestException as e:
+        return f"**[LỖI KẾT NỐI]** Lỗi kết nối đến n8n: {e}"
+
+def reset_rag_chat_session():
+    """Hàm này sẽ reset toàn bộ lịch sử chat và biến đếm cho RAG bot."""
+    st.session_state.rag_chat_history = []
+    if "rag_chat_counter" in st.session_state:
+        st.session_state.rag_chat_counter = 0
+
+    st.session_state.rag_chat_history.append(
+        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Tôi là RAG Chatbot, hãy hỏi tôi về dữ liệu KLTT."}
+    )
+    st.rerun()
+
+def rag_chat_tab():
+    """Thêm khung chat RAG vào tab."""
+    st.header("🤖 Chat với RAG Chatbot (Dựa trên Dữ liệu KLTT)")
+
+    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử RAG)", type="primary"):
+        reset_rag_chat_session()
+        return
+
+    # 1. KHỞI TẠO BIẾN ĐẾM & LỊCH SỬ CHAT
+    if "rag_chat_history" not in st.session_state:
+        st.session_state.rag_chat_history = []
+        st.session_state.rag_chat_counter = 0
+        st.session_state.rag_chat_history.append(
+            {"role": "assistant", "content": "Chào bạn, tôi là RAG Chatbot. Hãy hỏi tôi về dữ liệu Kết luận Thanh tra."}
+        )
+
+    current_count = st.session_state.get("rag_chat_counter", 0)
+    st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
+
+    st.markdown("---")
+
+    if "N8N_WEBHOOK_URL" not in st.secrets:
+        st.warning("Vui lòng thiết lập N8N_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot RAG.")
+
+    # Hiển thị lịch sử chat
+    for message in st.session_state.rag_chat_history:
+        avatar = "🤖" if message["role"] == "assistant" else "👤"
+        with st.chat_message(message["role"], avatar=avatar):
+            st.markdown(message["content"])
+
+    # 2. XỬ LÝ INPUT VÀ LOGIC RESET TỰ ĐỘNG
+    if user_prompt := st.chat_input("Hỏi RAG Chatbot...", key="rag_chat_input"):
+
+        # KIỂM TRA VÀ RESET PHIÊN CHAT (Tự động sau 5 câu)
+        if st.session_state.rag_chat_counter >= 5:
+            with st.chat_message("assistant", avatar="🤖"):
+                st.info("Phiên trò chuyện RAG đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
+            reset_rag_chat_session()
+            return
+
+        # 1. Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
+        st.session_state.rag_chat_history.append({"role": "user", "content": user_prompt})
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(user_prompt)
+
+        # 2. Gọi API RAG (n8n Webhook)
+        with st.chat_message("assistant", avatar="🤖"):
+            with st.spinner("RAG Chatbot đang xử lý..."):
+                response_text = call_rag_api(user_prompt)
+                st.markdown(response_text)
+
+                # 3. Cập nhật lịch sử chat với câu trả lời VÀ TĂNG BIẾN ĐẾM
+                st.session_state.rag_chat_history.append({"role": "assistant", "content": response_text})
+                st.session_state.rag_chat_counter += 1
+
+# ==========================================================
+# GEMINI CHAT LOGIC (GIỮ LOGIC CŨ, TÁCH BIẾN/HÀM)
 # ==========================================================
 
 def call_gemini_api(prompt: str):
@@ -168,7 +260,6 @@ def call_gemini_api(prompt: str):
     # *** HƯỚNG DẪN TÍCH HỢP GEMINI SDK THỰC TẾ ***
     # Vui lòng cài đặt: pip install google-genai
     # Đảm bảo có: st.secrets["GEMINI_API_KEY"]
-    # Để quản lý lịch sử chat, bạn nên lưu đối tượng chat của Gemini SDK vào st.session_state
     # **********************************************
     
     # Logic kiểm tra cấu hình và trả lời mô phỏng
@@ -180,7 +271,7 @@ def call_gemini_api(prompt: str):
 
 
 def reset_gemini_chat_session():
-    """Hàm này sẽ reset toàn bộ lịch sử chat và biến đếm (giống hệt logic RAG cũ)."""
+    """Hàm này sẽ reset toàn bộ lịch sử chat và biến đếm cho Gemini bot."""
     
     # 1. Reset lịch sử chat
     st.session_state.gemini_chat_history = []
@@ -199,11 +290,11 @@ def reset_gemini_chat_session():
 
 
 def gemini_chat_tab():
-    """Thêm khung chat Gemini vào tab, mô phỏng chính xác logic RAG Chatbot (counter, reset)."""
-    st.header("✨ Chat với Gemini (General Purpose)")
+    """Thêm khung chat Gemini vào tab."""
+    st.header("✨ Chat với Gemini (Mock API - General Purpose)")
     
     # Đặt nút Reset thủ công
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử)", type="primary"):
+    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử Gemini)", type="primary"):
         reset_gemini_chat_session()
         return
 
@@ -237,7 +328,7 @@ def gemini_chat_tab():
         # KIỂM TRA VÀ RESET PHIÊN CHAT (Tự động sau 5 câu)
         if st.session_state.gemini_chat_counter >= 5:
             with st.chat_message("assistant", avatar="✨"):
-                st.info("Phiên trò chuyện đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
+                st.info("Phiên trò chuyện Gemini đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
             
             reset_gemini_chat_session()
             return
@@ -390,11 +481,21 @@ with st.sidebar:
 
 
 # ==============================
-# Tabs (ĐÃ THAY THẾ RAG BOT BẰNG GEMINI BOT)
+# Tabs (BAO GỒM CẢ RAG BOT VÀ GEMINI BOT)
 # ==============================
 
-# THAY '🤖 Chatbot' thành '✨ Gemini'
-tab_docs, tab_over, tab_find, tab_act, tab_gemini = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions", "✨ Gemini"])
+tab_docs, tab_over, tab_find, tab_act, tab_rag, tab_gemini = st.tabs([
+    "📝 Documents",
+    "📊 Overalls",
+    "🚨 Findings",
+    "✅ Actions",
+    "🤖 Chatbot RAG",    # Tab RAG Bot
+    "✨ Gemini (Mock)"   # Tab Gemini Bot
+])
+
+# ---- RAG Chat Tab (GỌI HÀM KHÔI PHỤC) ----
+with tab_rag:
+    rag_chat_tab()
 
 # ---- Gemini Chat Tab (GỌI HÀM MỚI) ----
 with tab_gemini:
