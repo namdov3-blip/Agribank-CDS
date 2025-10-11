@@ -1,4 +1,3 @@
-
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
@@ -72,8 +71,8 @@ def format_vnd(n):
     if pd.isna(n): return "—"
     n = float(n)
     if abs(n) >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ ₫"
-    if abs(n) >= 1_000_000_000:     return f"{n/1_000_000_000:.2f} tỷ ₫"
-    if abs(n) >= 1_000_000:         return f"{n/1_000_000:.2f} triệu ₫"
+    if abs(n) >= 1_000_000_000:       return f"{n/1_000_000_000:.2f} tỷ ₫"
+    if abs(n) >= 1_000_000:           return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
 # ==============================
@@ -84,8 +83,8 @@ st.markdown("""
 <style>
 :root { --label-color: #1f6feb; }
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-  white-space: pre-wrap !important;
-  word-break: break-word !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
 }
 .info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
@@ -154,38 +153,57 @@ COL_MAP = {
 }
 
 # ==============================
-# Sidebar (Upload + Filters + Chatbot URLs)
+# Sidebar (Upload + Filters + Chatbot URLs + Embedded Chats)
 # ==============================
 
 with st.sidebar:
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
+    
     st.markdown("---")
-    st.subheader("🤖 Chatbot URLs")
+    st.subheader("🤖 Cấu hình Chatbot URLs")
     default_rag = st.secrets.get("RAG_BOT_URL", "") if hasattr(st, "secrets") else ""
     default_gem = st.secrets.get("GEMINI_BOT_URL", "") if hasattr(st, "secrets") else ""
     rag_url = st.text_input("N8N RAG Bot URL", value=default_rag, placeholder="https://your-n8n-domain/webhook/xxxx")
     gem_url = st.text_input("Gemini Chatbot URL", value=default_gem, placeholder="https://your-gemini-chat-url")
     st.session_state["rag_url"] = rag_url
     st.session_state["gem_url"] = gem_url
+    
+    # --- Khung chat nhúng trong Sidebar ---
+    
+    st.markdown("---")
+    
+    # Khung chat Gemini
+    st.subheader("✨ Hỏi đáp với Gemini")
+    if st.session_state.get("gem_url"):
+        # Độ cao (height) được điều chỉnh phù hợp với Sidebar.
+        # Chiều rộng (width) 100% là mặc định cho sidebar.
+        components.html(
+            f'<iframe src="{st.session_state["gem_url"]}" width="100%" height="400" style="border:0; padding: 0;"></iframe>',
+            height=400
+        )
+    else:
+        st.info("Chưa có URL Gemini. Vui lòng nhập URL.")
+
+    st.markdown("---")
+
+    # Khung chat RAG (n8n)
+    st.subheader("💬 Hỏi đáp với RAG Bot (n8n)")
+    if st.session_state.get("rag_url"):
+        components.html(
+            f'<iframe src="{st.session_state["rag_url"]}" width="100%" height="400" style="border:0; padding: 0;"></iframe>',
+            height=400
+        )
+    else:
+        st.info("Chưa có URL RAG Bot. Vui lòng nhập URL.")
+
 
 st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
 
-# Top-right Chatbot buttons
-btn_c1, btn_c2, btn_c3 = st.columns([1,0.22,0.22])
-with btn_c2:
-    if st.session_state.get("rag_url"):
-        try:
-            st.link_button("💬 Chatbot (RAG)", st.session_state["rag_url"], type="primary")
-        except Exception:
-            st.markdown(f'<a href="{st.session_state["rag_url"]}" target="_blank"><button>💬 Chatbot (RAG)</button></a>', unsafe_allow_html=True)
-with btn_c3:
-    if st.session_state.get("gem_url"):
-        try:
-            st.link_button("✨ Chatbot (Gemini)", st.session_state["gem_url"], type="secondary")
-        except Exception:
-            st.markdown(f'<a href="{st.session_state["gem_url"]}" target="_blank"><button>✨ Chatbot (Gemini)</button></a>', unsafe_allow_html=True)
+# Xóa các nút Chatbot góc trên bên phải để tập trung vào Sidebar
+# btn_c1, btn_c2, btn_c3 = st.columns([1,0.22,0.22])
+# ... (đoạn mã đã bị xóa)
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
@@ -224,9 +242,10 @@ df_find["legal_reference_filter"] = coalesce_series_with_raw(df_find["legal_refe
 df_find["legal_reference_chart"] = df_find["legal_reference_filter"].apply(lambda x: "RAW" if str(x).startswith("RAW") else x)
 
 # ==============================
-# Tabs (Chatbot tab can switch between RAG/Gemini)
+# Tabs (Removed dedicated Chatbot tab, as they are now in the sidebar)
 # ==============================
-tab_docs, tab_over, tab_find, tab_act, tab_chat = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions","🤖 Chatbot"])
+# Đã loại bỏ tab_chat
+tab_docs, tab_over, tab_find, tab_act = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions"])
 
 # ---- Documents (render all docs) ----
 with tab_docs:
@@ -385,14 +404,8 @@ with tab_act:
         }
         st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
 
-# ---- Chatbot Tab ----
-with tab_chat:
-    st.header("Chatbot")
-    mode = st.radio("Chọn bot để nhúng", options=["RAG (n8n)","Gemini"], horizontal=True)
-    url = st.session_state.get("rag_url","") if mode == "RAG (n8n)" else st.session_state.get("gem_url","")
-    if url:
-        components.html(f'<iframe src="{url}" width="100%" height="680" style="border:0;"></iframe>', height=700)
-    else:
-        st.info("Chưa có URL. Điền URL tương ứng ở sidebar (hoặc cấu hình trong secrets).")
+# ---- Chatbot Tab (Removed) ----
+# with tab_chat:
+#    ... (đoạn mã đã bị xóa)
 
 st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly • n8n RAG • Gemini")
