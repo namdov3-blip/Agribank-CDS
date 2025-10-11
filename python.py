@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ==============================
-# Helpers
+# Helpers (GIỮ NGUYÊN)
 # ==============================
 
 @st.cache_data(show_spinner=False)
@@ -75,7 +75,7 @@ def format_vnd(n):
     if abs(n) >= 1_000_000: return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
-# ===== Plot helpers for Overalls =====
+# ===== Plot helpers for Overalls (GIỮ NGUYÊN) =====
 PALETTE = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#0ea5e9", "#a855f7", "#22c55e", "#e11d48", "#6b7280"]
 
 def _format_vnd_text(v):
@@ -126,7 +126,7 @@ def make_pie(labels_vals, title="", height=260):
     return fig
 
 # ==============================
-# Theme + CSS
+# Theme + CSS (GIỮ NGUYÊN)
 # ==============================
 
 st.markdown("""
@@ -157,7 +157,7 @@ def info_card(label, value):
     )
 
 # ==============================
-# RAG CHATBOT LOGIC (Gọi n8n Webhook)
+# RAG CHATBOT LOGIC (Gọi n8n Webhook) (GIỮ NGUYÊN)
 # ==============================
 
 def call_n8n_rag_chatbot(prompt: str):
@@ -168,11 +168,19 @@ def call_n8n_rag_chatbot(prompt: str):
     webhook_url = st.secrets["N8N_RAG_WEBHOOK_URL"]
     
     # Payload phải khớp với cấu hình Webhook của n8n
-    payload = {"query": prompt}
+    # THÊM LOGIC GỬI CHAT ID ĐỂ KHẮC PHỤC LỖI SIMPLE MEMORY
+    if "chat_session_id" not in st.session_state:
+        # TẠO ID MỚI CHO PHIÊN CHAT NẾU CHƯA CÓ
+        st.session_state.chat_session_id = pd.Timestamp.now().strftime("%Y%m%d%H%M%S%f")
+
+    payload = {
+        "query": prompt,
+        "chatId": st.session_state.chat_session_id # THÊM chat ID
+    }
     
     try:
         # Gửi yêu cầu POST tới n8n
-        response = requests.post(webhook_url, json=payload, timeout=60)
+        response = requests.post(webhook_url, json=payload, timeout=90) # Tăng timeout lên 90s
         response.raise_for_status() # Báo lỗi nếu status code là 4xx hoặc 5xx
         
         # Phản hồi từ n8n (giả định n8n trả về JSON: {"response": "..."})
@@ -187,14 +195,16 @@ def call_n8n_rag_chatbot(prompt: str):
     except Exception as e:
         return f"Lỗi xử lý phản hồi từ n8n: {e}"
 
-def rag_chat_sidebar():
-    """Thêm khung chat RAG kết nối qua n8n Webhook vào sidebar."""
-    st.sidebar.header("🤖 Trợ lý RAG (qua n8n)")
-    st.sidebar.markdown("---")
+# ĐỔI TÊN HÀM TỪ rag_chat_sidebar THÀNH rag_chat_tab
+# VÀ THAY st.sidebar BẰNG st
+def rag_chat_tab():
+    """Thêm khung chat RAG kết nối qua n8n Webhook vào tab."""
+    st.header("🤖 Trợ lý RAG (Hỏi & Đáp Dữ liệu KLTT)")
+    st.markdown("---")
     
     # Kiểm tra URL Webhook
     if "N8N_RAG_WEBHOOK_URL" not in st.secrets:
-        st.sidebar.warning("Vui lòng thiết lập N8N_RAG_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot.")
+        st.warning("Vui lòng thiết lập N8N_RAG_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot.")
         return
 
     # Khởi tạo lịch sử chat
@@ -206,23 +216,22 @@ def rag_chat_sidebar():
 
     # Hiển thị lịch sử chat
     for message in st.session_state.rag_chat_history:
-        with st.sidebar.chat_message(message["role"]):
+        with st.chat_message(message["role"]): # Dùng st.chat_message thay vì st.sidebar.chat_message
             st.markdown(message["content"])
 
     # Xử lý input người dùng
-    user_prompt = st.sidebar.chat_input("Hỏi Trợ lý RAG...", key="rag_chat_input")
-
-    if user_prompt:
+    # Đặt chat_input ở cuối trang hoặc dưới dạng widget chính
+    if user_prompt := st.chat_input("Hỏi Trợ lý RAG...", key="rag_chat_input"):
         # 1. Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
         st.session_state.rag_chat_history.append({"role": "user", "content": user_prompt})
-        with st.sidebar.chat_message("user"):
+        with st.chat_message("user"):
             st.markdown(user_prompt)
 
         # 2. Gọi API n8n
-        with st.sidebar.chat_message("assistant"):
+        with st.chat_message("assistant"):
             with st.spinner("RAG Chatbot (n8n) đang xử lý..."):
                 
-                response_text = call_n8n_rag_chatbot(user_prompt) 
+                response_text = call_n8n_rag_chatbot(user_prompt)
                 
                 st.markdown(response_text)
                 
@@ -298,7 +307,7 @@ COL_MAP = {
 
 
 # ==============================
-# Sidebar (Upload + Filters)
+# Sidebar (Upload + Filters) (GIỮ NGUYÊN)
 # ==============================
 
 with st.sidebar:
@@ -309,18 +318,15 @@ with st.sidebar:
 st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
 
 # ==============================
-# KHỞI TẠO CHATBOX RAG
+# LOẠI BỎ lời gọi RAG CHATBOT TRONG SIDEBAR
 # ==============================
-# Lời gọi này sẽ được thực hiện trước cả st.stop() để chatbot luôn hiển thị
-# ngay cả khi chưa có file được tải lên.
-rag_chat_sidebar() 
+# rag_chat_sidebar() # <--- ĐÃ BỊ LOẠI BỎ
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
     st.stop()
 
 # ... (Tiếp tục xử lý dữ liệu)
-# ... (Giữ nguyên phần còn lại của code)
 
 data = load_excel(uploaded)
 
@@ -354,7 +360,7 @@ for c in ["quantified_amount","impacted_accounts"]:
 df_find["legal_reference_filter"] = coalesce_series_with_raw(df_find["legal_reference"], prefix="RAW")
 df_find["legal_reference_chart"] = df_find["legal_reference_filter"].apply(lambda x: "RAW" if str(x).startswith("RAW") else x)
 
-# Sidebar filter (findings only)
+# Sidebar filter (findings only) (GIỮ NGUYÊN)
 with st.sidebar:
     st.header("🔎 Lọc Findings")
     all_refs = sorted(df_find["legal_reference_filter"].astype(str).unique().tolist())
@@ -367,12 +373,17 @@ with st.sidebar:
 
 
 # ==============================
-# Tabs (giữ nguyên)
+# Tabs (ĐÃ THÊM TAB CHATBOT)
 # ==============================
 
-tab_docs, tab_over, tab_find, tab_act = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions"])
+# THÊM '🤖 Chatbot' VÀO DANH SÁCH TABS
+tab_docs, tab_over, tab_find, tab_act, tab_chat = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions", "🤖 Chatbot"])
 
-# ---- Documents (no dropdown; render all docs) ----
+# ---- Chatbot Tab (THÊM MỚI) ----
+with tab_chat:
+    rag_chat_tab()
+
+# ---- Documents (GIỮ NGUYÊN) ----
 with tab_docs:
     st.header("Báo Cáo Kết Luận Thanh Tra (Metadata)")
     st.markdown("---")
@@ -401,7 +412,7 @@ with tab_docs:
             st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ---- Overalls (giữ nguyên) ----
+# ---- Overalls (GIỮ NGUYÊN) ----
 with tab_over:
     st.header("Thông Tin Tổng Quan")
     st.markdown("---")
@@ -496,8 +507,8 @@ with tab_over:
     st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
         ("DN Nhà nước", "strucuture_econ_state_vnd"),
-        ("DN tổ chức kinh tế", "structure_econ_nonstate_enterprises_vnd"),
-        ("DN tư nhân cá thể", "structure_econ_individuals_households_vnd"),
+        ("DN tổ chức kinh tế", "strucuture_econ_nonstate_enterprises_vnd"),
+        ("DN tư nhân cá thể", "strucuture_econ_individuals_households_vnd"),
     ]
     eco_data = []
     for n, c in eco_items:
@@ -507,7 +518,7 @@ with tab_over:
     fig_e = make_bar(dfe, title="Thành phần kinh tế (bar nhỏ, hiển thị 0)")
     st.plotly_chart(fig_e, use_container_width=True)
 
-# ---- Findings (giữ nguyên) ----
+# ---- Findings (GIỮ NGUYÊN) ----
 with tab_find:
     st.header("Phát hiện & Nguyên nhân (Findings)")
     st.subheader(f"Đang lọc theo: {len(selected_refs)}/{len(all_refs)} legal_reference")
@@ -584,7 +595,7 @@ with tab_find:
         })
         st.dataframe(law_tbl, use_container_width=True)
 
-# ---- Actions (show ALL rows, no filtering by findings) ----
+# ---- Actions (GIỮ NGUYÊN) ----
 with tab_act:
     st.header("Biện pháp khắc phục (Actions)")
     st.markdown("---")
