@@ -138,12 +138,16 @@ COL_MAPPING = {
         "category": ["category", "MucLoi", "PhanLoai"],
         "sub_category": ["sub_category", "LoiCT", "TieuPhanLoai"],
         "description": ["description", "Mota", "Noidung"],
-        # Cột gây lỗi: legal_reference
-        "legal_reference": ["legal_reference", "Dieuluat", "Quy dinh", "Thamchieu"],
+        # Cột legal_reference bắt buộc để liên kết với Actions
+        "legal_reference": ["legal_reference", "Dieuluat", "Quy dinh", "Thamchieu"], 
         "quantified_amount": ["quantified_amount", "Sotien", "TienAnhhuong"],
         "impacted_accounts": ["impacted_accounts", "SoHoSo", "SoKH"],
         "root_cause": ["root_cause", "Nguyengoc", "LyDo"],
         "recommendation": ["recommendation", "Kiennghi", "DeXuat"],
+        # CÁC CỘT ACTION ĐÃ ĐƯỢC CHUYỂN SANG MAPPING "actions" RIÊNG BIỆT
+    },
+    "actions": { # MAPPING MỚI CHO SHEET ACTIONS
+        "legal_reference": ["legal_reference", "Dieuluat", "Quy dinh", "Thamchieu"], # Dùng để lọc và liên kết
         "action_type": ["action_type", "LoaiAction", "Tinhchat"],
         "action_description": ["action_description", "MotaAction", "NoidungXP"],
         "evidence_of_completion": ["evidence_of_completion", "Minhchung", "Hoanthanh"],
@@ -156,7 +160,8 @@ st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
 
 # Tải file Excel
 uploaded_file = st.file_uploader(
-    "Tải lên file Excel (.xlsx) chứa các sheet: **documents, overalls, findings**", 
+    # Cập nhật mô tả để bao gồm sheet actions
+    "Tải lên file Excel (.xlsx) chứa các sheet: **documents, overalls, findings, actions**", 
     type=["xlsx"]
 )
 
@@ -170,25 +175,32 @@ data = load_excel(uploaded_file)
 # Lấy dữ liệu từ các sheet và chuẩn hóa tên cột
 def get_processed_df(sheet_name):
     df_raw = data.get(sheet_name)
-    if df_raw is None:
-        return pd.DataFrame() # Trả về DF rỗng nếu không tìm thấy sheet
+    # Tên sheet chuẩn hóa (ví dụ: 'actions') sẽ được dùng để kiểm tra COL_MAPPING
+    mapping = COL_MAPPING.get(sheet_name)
+    
+    if df_raw is None or mapping is None:
+        # Nếu không có sheet hoặc mapping, trả về DF rỗng nhưng không báo lỗi nếu sheet không bắt buộc
+        return pd.DataFrame() 
     
     # Chuẩn hóa tên cột bằng mapping đã định nghĩa
-    df_canonical = canonicalize_df(df_raw.copy(), COL_MAPPING[sheet_name])
+    df_canonical = canonicalize_df(df_raw.copy(), mapping)
     
     # Kiểm tra cột bắt buộc
-    required_cols = list(COL_MAPPING[sheet_name].keys())
+    required_cols = list(mapping.keys())
     missing_cols = [col for col in required_cols if col not in df_canonical.columns]
     
-    if missing_cols and sheet_name in ["documents", "findings"]:
+    # Chỉ check nghiêm ngặt các sheet 'documents', 'findings', 'actions'
+    if missing_cols and sheet_name in ["documents", "findings", "actions"]:
         st.error(f"Sheet **'{sheet_name}'** thiếu các cột bắt buộc đã được chuẩn hóa: **{', '.join(missing_cols)}**. Vui lòng kiểm tra lại tên cột trong file Excel.")
         st.stop()
         
     return df_canonical
 
+# Tải 4 sheet chính
 df_docs = get_processed_df("documents")
 df_over = get_processed_df("overalls")
 df_findings = get_processed_df("findings")
+df_actions = get_processed_df("actions") # Tải sheet Actions riêng biệt
 
 # --- XỬ LÝ DỮ LIỆU CHUNG ---
 
@@ -209,9 +221,8 @@ for col in num_find_cols:
     if col in df_findings.columns:
         df_findings[col] = df_findings[col].apply(to_number)
 
-# XỬ LÝ LỖI 'legal_reference' (RAW)
+# XỬ LÝ LỖI 'legal_reference' (RAW) cho df_findings
 if "legal_reference" in df_findings.columns:
-    # Coalesce empty legal_reference to RAW-01, RAW-02...
     df_findings["legal_reference_filter"] = coalesce_series_with_raw(df_findings["legal_reference"], prefix="RAW")
     
     # Tạo cột cho mục đích biểu đồ (gom tất cả RAW lại thành 1 nhóm)
@@ -219,8 +230,8 @@ if "legal_reference" in df_findings.columns:
         lambda x: 'RAW (Chưa xác định)' if 'RAW' in str(x) and str(x) != x else x
     )
 else:
-    # Nếu cột legal_reference hoàn toàn không tồn tại (đã bị chặn ở get_processed_df)
-    st.error("Sheet 'findings' không có cột 'legal_reference' (hoặc tên thay thế tương đương).")
+    # Nếu cột legal_reference hoàn toàn không tồn tại
+    st.error("Sheet 'findings' không có cột 'legal_reference' (hoặc tên thay thế tương đương) để liên kết. Vui lòng kiểm tra lại.")
     st.stop()
 
 
@@ -247,8 +258,14 @@ selected_refs = st.sidebar.multiselect(
     default=unique_legal_refs # Mặc định chọn tất cả
 )
 
-# Lọc DataFrame
+# Lọc DataFrame Findings
 df_filtered = df_findings[df_findings['legal_reference_filter'].astype(str).isin([str(x) for x in selected_refs])]
+
+# Lọc DataFrame Actions (Dùng chung bộ lọc legal_reference)
+df_actions_filtered = pd.DataFrame()
+if not df_actions.empty and "legal_reference" in df_actions.columns:
+    df_actions["legal_reference_filter"] = coalesce_series_with_raw(df_actions["legal_reference"], prefix="RAW")
+    df_actions_filtered = df_actions[df_actions['legal_reference_filter'].astype(str).isin([str(x) for x in selected_refs])]
 
 # Hiển thị số liệu tổng hợp trong sidebar
 st.sidebar.markdown("---")
@@ -419,7 +436,7 @@ with tab3:
         for sub_cat in sub_categories:
             st.markdown(f"#### 🔎 Lỗi Chi tiết: **{sub_cat}** (Số lần xuất hiện: {len(df_filtered[df_filtered['sub_category'] == sub_cat]):,})")
             
-            # Lựa chọn các cột cần hiển thị
+            # Lựa chọn các cột cần hiển thị (Không còn cột action_type, action_description, evidence_of_completion)
             display_cols = ['legal_reference_filter', 'description', 'quantified_amount', 'impacted_accounts']
             if 'root_cause' in df_filtered.columns:
                 display_cols.append('root_cause')
@@ -457,15 +474,16 @@ with tab4:
     st.subheader(f"Dữ liệu Hành động đang được lọc theo: **{len(selected_refs)}/{len(unique_legal_refs)} điều luật**")
     st.markdown("---")
     
-    if df_filtered.empty:
-        st.warning("Không có dữ liệu hành động nào khớp với bộ lọc hiện tại.")
+    # SỬ DỤNG DATAFRAME ĐÃ LỌC RIÊNG CHO ACTIONS
+    if df_actions_filtered.empty:
+        st.warning("Không có dữ liệu hành động nào khớp với bộ lọc hiện tại hoặc sheet 'actions' không tồn tại/bị thiếu cột.")
     else:
         # ------------------
         # 4.1. Biểu đồ Phân loại Hành động
         # ------------------
-        if 'action_type' in df_filtered.columns:
+        if 'action_type' in df_actions_filtered.columns:
             st.subheader("1. Phân loại Tính chất của Biện pháp Cải tạo (Action Type)")
-            df_action_count = df_filtered['action_type'].value_counts().reset_index()
+            df_action_count = df_actions_filtered['action_type'].value_counts().reset_index()
             df_action_count.columns = ['Action_Type', 'Count']
             
             fig_action = px.pie(
@@ -486,7 +504,7 @@ with tab4:
         
         # Lựa chọn các cột hành động cần hiển thị
         action_cols = ['legal_reference_filter', 'action_type', 'action_description', 'evidence_of_completion']
-        action_cols = [c for c in action_cols if c in df_filtered.columns] # Chỉ lấy cột có tồn tại
+        action_cols = [c for c in action_cols if c in df_actions_filtered.columns] # Chỉ lấy cột có tồn tại
         
         rename_map = {
             'legal_reference_filter': 'Luật Lệ Liên quan (RAW-XX)',
@@ -497,7 +515,7 @@ with tab4:
         
         # Bảng chi tiết
         st.dataframe(
-            df_filtered[action_cols].rename(columns=rename_map),
+            df_actions_filtered[action_cols].rename(columns=rename_map),
             use_container_width=True,
             height=500
         )
