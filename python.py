@@ -74,6 +74,56 @@ def format_vnd(n):
     if abs(n) >= 1_000_000:         return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
+# ===== Plot helpers for Overalls =====
+PALETTE = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#0ea5e9", "#a855f7", "#22c55e", "#e11d48", "#6b7280"]
+
+def _format_vnd_text(v):
+    if pd.isna(v): return "—"
+    try:
+        v = float(v)
+    except:
+        return "—"
+    if abs(v) < 0.5:
+        return "0 ₫"
+    return format_vnd(v)
+
+def make_bar(df_in, x_col="Chỉ tiêu", y_col="Giá trị", title="", height=260):
+    """Bar chart gọn: mỗi cột 1 màu; nhãn in đậm & đổi màu; hiển thị số 0."""
+    d = df_in.copy()
+    n = len(d)
+    colors = PALETTE[:max(1, n)]
+    fig = px.bar(
+        d, x=x_col, y=y_col,
+        text=d[y_col].apply(_format_vnd_text),
+        color=x_col, color_discrete_sequence=colors,
+        title=title
+    )
+    fig.update_traces(
+        textposition="outside",
+        texttemplate="<b>%{text}</b>",
+        marker_line_color="white",
+        marker_line_width=0.5,
+        textfont=dict(color="#0ea5e9", size=12)
+    )
+    fig.update_layout(
+        height=height, bargap=0.40,
+        yaxis_title="VND", xaxis_title="", legend_title_text="",
+        margin=dict(l=10, r=10, t=60, b=10)
+    )
+    return fig
+
+def make_pie(labels_vals, title="", height=260):
+    d = pd.DataFrame(labels_vals, columns=["Nhóm", "Giá trị"])
+    d["Giá trị"] = d["Giá trị"].apply(lambda x: 0 if pd.isna(x) else float(x))
+    fig = px.pie(
+        d, names="Nhóm", values="Giá trị", hole=.35,
+        color="Nhóm", color_discrete_sequence=PALETTE,
+        title=title
+    )
+    fig.update_traces(textinfo="percent+label", textfont=dict(size=12), pull=[0.02]*len(d))
+    fig.update_layout(height=height, margin=dict(l=10, r=10, t=60, b=10))
+    return fig
+
 # ==============================
 # Theme + CSS
 # ==============================
@@ -89,8 +139,7 @@ st.markdown("""
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
 .info-card .value { font-size: 15px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
 .doc-wrap { padding: 10px 14px; border: 1px solid #e6e6e6; border-radius: 12px; background: #fafcff; margin-bottom: 14px; }
-.doc-title { font-weight: 700; font-size: 16px; margin-bottom: 8px; color: #0f172a; }
-.doc-label { color:#0ea5e9; font-weight:800; }
+.doc-title { font-weight: 700; font-size: 16px; margin-bottom: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -134,7 +183,7 @@ COL_MAP = {
         "sample_total_files": ["sample_total_files"],
         "sample_outstanding_checked_vnd": ["sample_outstanding_checked_vnd"],
 
-        # Bổ sung cho phần 2 (biểu đồ)
+        # Bổ sung theo yêu cầu phần biểu đồ
         "structure_quality_group1_vnd": ["structure_quality_group1_vnd"],
         "structure_quality_group2_vnd": ["structure_quality_group2_vnd"],
         "structure_quality_group3_vnd": ["structure_quality_group3_vnd"],
@@ -146,7 +195,7 @@ COL_MAP = {
         "structure_currency_fx_vnd": ["structure_currency_fx_vnd"],
 
         "structure_purpose_bds_flexible_vnd": ["structure_purpose_bds_flexible_vnd"],
-        "strucuture_purpose_securities_vnd": ["strucuture_purpose_securities_vnd"],  # giữ nguyên chính tả từ file Excel
+        "strucuture_purpose_securities_vnd": ["strucuture_purpose_securities_vnd"],
         "structure_purpose_consumption_vnd": ["structure_purpose_consumption_vnd"],
         "structure_purpose_trade_vnd": ["structure_purpose_trade_vnd"],
         "structure_purpose_other_vnd": ["structure_purpose_other_vnd"],
@@ -243,28 +292,28 @@ with tab_docs:
     if len(df_docs) == 0:
         st.info("Không có dữ liệu documents.")
     else:
-        for _, row in df_docs.reset_index(drop=True).iterrows():
+        for idx, row in df_docs.reset_index(drop=True).iterrows():
             st.markdown(f'<div class="doc-wrap"><div class="doc-title">📝 Báo cáo kết luận thanh tra — {str(row.get("doc_id","—"))}</div>', unsafe_allow_html=True)
             c1, c2, c3, c4 = st.columns(4)
             with c1:
-                info_card("<span class='doc-label'>Mã số KLTT (Doc_id)</span>", str(row.get("doc_id","—")))
-                info_card("<span class='doc-label'>Đơn vị phát hành</span>", str(row.get("issuing_authority","—")))
-                info_card("<span class='doc-label'>Người kiểm soát</span>", str(row.get("signer_name","—")))
+                info_card("Mã số kết luận thanh tra (Doc_id)", str(row.get("doc_id","—")))
+                info_card("Đơn vị phát hành (Issuing_authority)", str(row.get("issuing_authority","—")))
+                info_card("Người kiểm soát (Signer_name)", str(row.get("signer_name","—")))
             with c2:
                 d = row.get("issue_date", pd.NaT)
-                info_card("<span class='doc-label'>Ngày phát hành</span>", d.strftime("%d/%m/%Y") if pd.notna(d) else "—")
-                info_card("<span class='doc-label'>Đơn vị được kiểm tra</span>", str(row.get("inspected_entity_name","—")))
-                info_card("<span class='doc-label'>Chức vụ</span>", str(row.get("signer_title","—")))
+                info_card("Ngày phát hành (Issue_date)", d.strftime("%d/%m/%Y") if pd.notna(d) else "—")
+                info_card("Đơn vị được kiểm tra (inspected_entity_name)", str(row.get("inspected_entity_name","—")))
+                info_card("Chức vụ (Signer_title)", str(row.get("signer_title","—")))
             with c3:
-                info_card("<span class='doc-label'>Title</span>", str(row.get("title","—")))
-                info_card("<span class='doc-label'>Lĩnh vực</span>", str(row.get("sector","—")))
+                info_card("Title", str(row.get("title","—")))
+                info_card("Lĩnh vực (sector)", str(row.get("sector","—")))
             with c4:
                 ps = row.get("period_start", pd.NaT); pe = row.get("period_end", pd.NaT)
-                info_card("<span class='doc-label'>Thời gian bắt đầu</span>", ps.strftime("%d/%m/%Y") if pd.notna(ps) else "—")
-                info_card("<span class='doc-label'>Thời gian kết thúc</span>", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
+                info_card("Thời gian bắt đầu (period_start)", ps.strftime("%d/%m/%Y") if pd.notna(ps) else "—")
+                info_card("Thời gian kết thúc (period_end)", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
             st.markdown("</div>", unsafe_allow_html=True)
 
-# ---- Overalls ----
+# ---- Overalls (UPDATED) ----
 with tab_over:
     st.header("Thông Tin Tổng Quan")
     st.markdown("---")
@@ -287,68 +336,59 @@ with tab_over:
         st.metric("Tỷ lệ NPL / Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f}%" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
         st.metric("Tổng dư nợ đã kiểm tra", format_vnd(over_row.get("sample_outstanding_checked_vnd", np.nan)))
 
-    # ===== BIỂU ĐỒ =====
     st.markdown("---")
 
-    # 1) Line chart: chất lượng nhóm 1-3 theo thời gian (nếu có nhiều bản ghi)
-    st.subheader("Xu hướng chất lượng tín dụng (Nhóm 1-3)")
-    q_cols = ["structure_quality_group1_vnd","structure_quality_group2_vnd","structure_quality_group3_vnd"]
-    available_q = [c for c in q_cols if c in df_over.columns]
-    if available_q:
-        dfq = df_over[available_q].copy()
-        # Trục thời gian: ưu tiên issue_date/period_end nếu tồn tại, nếu không dùng index thứ tự
-        time_col = None
-        for tcol in ["issue_date","period_end","period_start"]:
-            if tcol in df_docs.columns:
-                time_col = tcol
-                break
-        if time_col and not df_docs.empty:
-            # gắn thời điểm của documents gần nhất chiều dài df_over, fallback index
-            x_axis = pd.Series(range(1, len(df_over)+1), name="Kỳ")
-        else:
-            x_axis = pd.Series(range(1, len(df_over)+1), name="Kỳ")
-        dfq.insert(0, "Kỳ", x_axis)
-        dfm = dfq.melt(id_vars="Kỳ", var_name="Nhóm", value_name="Giá trị")
-        dfm["Giá trị"] = dfm["Giá trị"].apply(to_number)
-        fig_q = px.line(dfm, x="Kỳ", y="Giá trị", color="Nhóm", markers=True,
-                        labels={"Giá trị":"Số tiền (VND)"})
-        fig_q.update_layout(height=360, yaxis_title="VND", xaxis_title="Kỳ")
-        st.plotly_chart(fig_q, use_container_width=True)
-    else:
-        st.info("Không có cột structure_quality_group1/2/3_vnd để vẽ xu hướng.")
+    # 1) Chất lượng tín dụng Nhóm 1–3 (Bar + Pie)
+    st.subheader("**Chất lượng tín dụng (Nhóm 1–3)**")
+    q_items = [
+        ("Nhóm 1", "structure_quality_group1_vnd"),
+        ("Nhóm 2", "structure_quality_group2_vnd"),
+        ("Nhóm 3", "structure_quality_group3_vnd"),
+    ]
+    q_data = []
+    for n, c in q_items:
+        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
+        val = 0 if pd.isna(val) else float(val)
+        q_data.append({"Chỉ tiêu": n, "Giá trị": val})
+    dfq = pd.DataFrame(q_data)
+    c1, c2 = st.columns([2,1])
+    with c1:
+        fig_q_bar = make_bar(dfq, title="Bar: Quy mô theo nhóm (nhãn đậm & đổi màu)")
+        st.plotly_chart(fig_q_bar, use_container_width=True)
+    with c2:
+        fig_q_pie = make_pie([(r["Chỉ tiêu"], r["Giá trị"]) for _, r in dfq.iterrows()], title="Pie: Cơ cấu tỷ trọng")
+        st.plotly_chart(fig_q_pie, use_container_width=True)
 
-    # 2) Bar: cơ cấu kỳ hạn
-    st.subheader("Cơ cấu theo kỳ hạn")
+    # 2) Kỳ hạn
+    st.subheader("**Cơ cấu theo kỳ hạn**")
     term_items = [
         ("Dư nợ ngắn hạn", "structure_term_short_vnd"),
         ("Dư nợ trung & dài hạn", "structure_term_medium_long_vnd"),
     ]
-    term_data = [{"Chỉ tiêu": n, "Giá trị": over_row.get(c, np.nan)} for n, c in term_items if c in df_over.columns]
-    if term_data:
-        dft = pd.DataFrame(term_data)
-        dft["Giá trị"] = dft["Giá trị"].apply(to_number)
-        fig_t = px.bar(dft, x="Chỉ tiêu", y="Giá trị", text=dft["Giá trị"].apply(lambda v: format_vnd(v)))
-        fig_t.update_traces(textposition="outside")
-        fig_t.update_layout(height=320, yaxis_title="VND", xaxis_title="")
-        st.plotly_chart(fig_t, use_container_width=True)
+    term_data = []
+    for n, c in term_items:
+        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
+        term_data.append({"Chỉ tiêu": n, "Giá trị": 0 if pd.isna(val) else float(val)})
+    dft = pd.DataFrame(term_data)
+    fig_t = make_bar(dft, title="Kỳ hạn (bar nhỏ, mỗi cột 1 màu)")
+    st.plotly_chart(fig_t, use_container_width=True)
 
-    # 3) Bar: cơ cấu tiền tệ
-    st.subheader("Cơ cấu theo tiền tệ")
+    # 3) Tiền tệ
+    st.subheader("**Cơ cấu theo tiền tệ**")
     cur_items = [
         ("Dư nợ bằng VND", "structure_currency_vnd_vnd"),
         ("Dư nợ quy đổi ngoại tệ", "structure_currency_fx_vnd"),
     ]
-    cur_data = [{"Chỉ tiêu": n, "Giá trị": over_row.get(c, np.nan)} for n, c in cur_items if c in df_over.columns]
-    if cur_data:
-        dfc = pd.DataFrame(cur_data)
-        dfc["Giá trị"] = dfc["Giá trị"].apply(to_number)
-        fig_c = px.bar(dfc, x="Chỉ tiêu", y="Giá trị", text=dfc["Giá trị"].apply(lambda v: format_vnd(v)))
-        fig_c.update_traces(textposition="outside")
-        fig_c.update_layout(height=320, yaxis_title="VND", xaxis_title="")
-        st.plotly_chart(fig_c, use_container_width=True)
+    cur_data = []
+    for n, c in cur_items:
+        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
+        cur_data.append({"Chỉ tiêu": n, "Giá trị": 0 if pd.isna(val) else float(val)})
+    dfc = pd.DataFrame(cur_data)
+    fig_c = make_bar(dfc, title="Tiền tệ (bar nhỏ, nhãn đậm & màu)")
+    st.plotly_chart(fig_c, use_container_width=True)
 
-    # 4) Bar: cơ cấu mục đích
-    st.subheader("Cơ cấu theo mục đích vay")
+    # 4) Mục đích vay
+    st.subheader("**Cơ cấu theo mục đích vay**")
     pur_items = [
         ("BĐS / linh hoạt", "structure_purpose_bds_flexible_vnd"),
         ("Chứng khoán", "strucuture_purpose_securities_vnd"),
@@ -356,30 +396,28 @@ with tab_over:
         ("Thương mại", "structure_purpose_trade_vnd"),
         ("Mục đích khác", "structure_purpose_other_vnd"),
     ]
-    pur_data = [{"Chỉ tiêu": n, "Giá trị": over_row.get(c, np.nan)} for n, c in pur_items if c in df_over.columns]
-    if pur_data:
-        dfp = pd.DataFrame(pur_data)
-        dfp["Giá trị"] = dfp["Giá trị"].apply(to_number)
-        fig_p = px.bar(dfp, x="Chỉ tiêu", y="Giá trị", text=dfp["Giá trị"].apply(lambda v: format_vnd(v)))
-        fig_p.update_traces(textposition="outside")
-        fig_p.update_layout(height=360, yaxis_title="VND", xaxis_title="")
-        st.plotly_chart(fig_p, use_container_width=True)
+    pur_data = []
+    for n, c in pur_items:
+        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
+        pur_data.append({"Chỉ tiêu": n, "Giá trị": 0 if pd.isna(val) else float(val)})
+    dfp = pd.DataFrame(pur_data)
+    fig_p = make_bar(dfp, title="Mục đích vay (bar nhỏ)")
+    st.plotly_chart(fig_p, use_container_width=True)
 
-    # 5) Bar: cơ cấu theo thành phần kinh tế
-    st.subheader("Cơ cấu theo thành phần kinh tế")
+    # 5) Thành phần kinh tế (luôn hiển thị cả 0)
+    st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
         ("DN Nhà nước", "strucuture_econ_state_vnd"),
         ("DN ngoài QD", "strucuture_econ_nonstate_enterprises_vnd"),
         ("Cá nhân/Hộ gia đình", "strucuture_econ_individuals_households_vnd"),
     ]
-    eco_data = [{"Chỉ tiêu": n, "Giá trị": over_row.get(c, np.nan)} for n, c in eco_items if c in df_over.columns]
-    if eco_data:
-        dfe = pd.DataFrame(eco_data)
-        dfe["Giá trị"] = dfe["Giá trị"].apply(to_number)
-        fig_e = px.bar(dfe, x="Chỉ tiêu", y="Giá trị", text=dfe["Giá trị"].apply(lambda v: format_vnd(v)))
-        fig_e.update_traces(textposition="outside")
-        fig_e.update_layout(height=360, yaxis_title="VND", xaxis_title="")
-        st.plotly_chart(fig_e, use_container_width=True)
+    eco_data = []
+    for n, c in eco_items:
+        val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
+        eco_data.append({"Chỉ tiêu": n, "Giá trị": 0 if pd.isna(val) else float(val)})
+    dfe = pd.DataFrame(eco_data)
+    fig_e = make_bar(dfe, title="Thành phần kinh tế (bar nhỏ, hiển thị 0)")
+    st.plotly_chart(fig_e, use_container_width=True)
 
 # ---- Findings ----
 with tab_find:
@@ -407,11 +445,11 @@ with tab_find:
             st.plotly_chart(fig2, use_container_width=True)
 
         st.markdown("---")
-        st.subheader("Xu hướng theo Legal_reference (gộp RAW1/RAW2/RAW3 → RAW)")
+        st.subheader("Xu hướng theo Legal_reference (gộp RAWx → RAW)")
         legal_count = f_df["legal_reference_chart"].value_counts().reset_index()
         legal_count.columns = ["Legal_reference","Count"]
         fig3 = px.line(legal_count, x="Legal_reference", y="Count", markers=True,
-                       title="Số lần xuất hiện theo Legal_reference")
+                       title="Số lần xuất hiện theo Legal_reference (gộp RAWx→RAW)")
         st.plotly_chart(fig3, use_container_width=True)
         st.info("RAW = luật/quy định không được nhắc tới; ô trống đã gán RAW1, RAW2… và gộp thành RAW cho biểu đồ.")
 
@@ -427,7 +465,6 @@ with tab_find:
         for sub in order_sub:
             st.markdown(f"#### 🔹 {sub}")
             sub_df = f_df[f_df["sub_category"]==sub].copy()
-            # Giữ RAW1/RAW2/RAW3 nguyên văn, không tạo cột 'none' và KHÔNG hiển thị recommendation ở đây
             sub_df["legal_reference"] = sub_df["legal_reference_filter"]
             cols_show = [c for c in ["description","legal_reference","quantified_amount","impacted_accounts","root_cause"] if c in sub_df.columns]
             sub_df = sub_df[cols_show]
@@ -457,7 +494,6 @@ with tab_find:
             "root_cause":"Root_cause",
             "recommendation":"Recommendation"
         })
-        # Bỏ các cột tổng hợp số vụ/hồ sơ/tiền theo yêu cầu (không tính tổng)
         st.dataframe(law_tbl, use_container_width=True)
 
 # ---- Actions (show ALL rows, no filtering by findings) ----
@@ -469,7 +505,7 @@ with tab_act:
     else:
         df_act_full = df_act.copy()
         df_act_full["Legal_reference"] = coalesce_series_with_raw(df_act_full["legal_reference"], prefix="RAW")
-        # Chart: phân loại rõ tính chất
+        # Chart
         if "action_type" in df_act_full.columns:
             act_count = df_act_full["action_type"].value_counts().reset_index()
             act_count.columns = ["Action_type","Count"]
@@ -477,7 +513,7 @@ with tab_act:
             fig.update_traces(textinfo="percent+label")
             st.plotly_chart(fig, use_container_width=True)
         st.markdown("---")
-        # Table (hiển thị đầy đủ mọi dòng)
+        # Table (all rows)
         cols = [c for c in ["Legal_reference","action_type","action_description","evidence_of_completion"] if c in df_act_full.columns or c=="Legal_reference"]
         rename = {
             "action_type":"Tính chất biện pháp",
@@ -485,6 +521,5 @@ with tab_act:
             "evidence_of_completion":"Công việc chi tiết / Minh chứng"
         }
         st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
-        st.caption(f"Đang hiển thị đầy đủ {len(df_act_full)} dòng actions.")
 
 st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
