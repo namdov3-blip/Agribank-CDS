@@ -1,4 +1,3 @@
-
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
@@ -10,6 +9,8 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
+# Cần thêm thư viện này để nhúng iframe/html vào Streamlit
+import streamlit.components.v1 as components 
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -71,8 +72,8 @@ def format_vnd(n):
     if pd.isna(n): return "—"
     n = float(n)
     if abs(n) >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ ₫"
-    if abs(n) >= 1_000_000_000:     return f"{n/1_000_000_000:.2f} tỷ ₫"
-    if abs(n) >= 1_000_000:         return f"{n/1_000_000:.2f} triệu ₫"
+    if abs(n) >= 1_000_000_000:       return f"{n/1_000_000_000:.2f} tỷ ₫"
+    if abs(n) >= 1_000_000:           return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
 # ==============================
@@ -83,8 +84,8 @@ st.markdown("""
 <style>
 :root { --label-color: #1f6feb; }
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-  white-space: pre-wrap !important;
-  word-break: break-word !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
 }
 .info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
@@ -153,13 +154,24 @@ COL_MAP = {
 }
 
 # ==============================
-# Sidebar (Upload + Filters)
+# Sidebar (Upload + Filters + Chatbots)
 # ==============================
 
 with st.sidebar:
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
+    
+    # --- Thêm phần cấu hình URL Chatbot ---
+    st.markdown("---")
+    st.subheader("🔗 Cấu hình Chatbot URLs")
+    # Bạn có thể dùng st.secrets.get("RAG_BOT_URL", "") nếu đã cấu hình file secrets.toml
+    rag_url = st.text_input("N8N RAG Bot URL", value="", placeholder="https://your-n8n-domain/webhook/xxxx", key="rag_url_input")
+    gem_url = st.text_input("Gemini Chatbot URL", value="", placeholder="https://your-gemini-chat-url", key="gem_url_input")
+    
+    # Lưu URL vào session state để dễ dàng truy cập sau này
+    st.session_state["RAG_URL"] = rag_url
+    st.session_state["GEMINI_URL"] = gem_url
 
 st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
 
@@ -208,6 +220,37 @@ f_df = df_find[df_find["legal_reference_filter"].astype(str).isin([str(x) for x 
 st.sidebar.markdown("---")
 st.sidebar.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
 st.sidebar.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
+
+# --- THÊM KHUNG CHATBOT VÀO SIDEBAR ---
+
+with st.sidebar:
+    st.markdown("---")
+    
+    # 1. Khung chat Gemini
+    st.subheader("✨ Hỏi đáp với Gemini")
+    gem_url = st.session_state.get("https://gemini.google.com/app")
+    if gem_url:
+        # Sử dụng components.html để nhúng iframe
+        # Thiết lập chiều cao (height) cố định để chatbot hiển thị ổn định
+        components.html(
+            f'<iframe src="{gem_url}" width="100%" height="450" style="border:0; padding: 0;"></iframe>',
+            height=460 # Streamlit component cần height lớn hơn iframe một chút
+        )
+    else:
+        st.info("https://gemini.google.com/app")
+        
+    st.markdown("---")
+
+    # 2. Khung chat RAG (n8n)
+    st.subheader("💬 Hỏi đáp với RAG Bot (n8n)")
+    rag_url = st.session_state.get("https://n8n.srv1002180.hstgr.cloud/workflow/4JFnte2smFIsEKBv")
+    if rag_url:
+        components.html(
+            f'<iframe src="{rag_url}" width="100%" height="450" style="border:0; padding: 0;"></iframe>',
+            height=460
+        )
+    else:
+        st.info("https://n8n.srv1002180.hstgr.cloud/workflow/4JFnte2smFIsEKBv")
 
 # ==============================
 # Tabs
