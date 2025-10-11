@@ -1,8 +1,7 @@
-
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
-# Yêu cầu: pip install streamlit pandas altair openpyxl plotly
+# Yêu cầu: pip install streamlit pandas altair openpyxl plotly google-genai
 
 import io
 import numpy as np
@@ -10,6 +9,9 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
+# Thêm thư viện Google GenAI
+from google import genai
+from google.genai import types
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -20,10 +22,12 @@ st.set_page_config(
 
 # ==============================
 # Helpers
+# ... (giữ nguyên các hàm helpers như cũ)
 # ==============================
 
 @st.cache_data(show_spinner=False)
 def load_excel(uploaded_file: io.BytesIO) -> dict:
+    # ... (giữ nguyên nội dung hàm load_excel)
     xls = pd.ExcelFile(uploaded_file, engine="openpyxl")
     sheets = {s.lower().strip(): s for s in xls.sheet_names}
     out = {}
@@ -34,6 +38,7 @@ def load_excel(uploaded_file: io.BytesIO) -> dict:
     return out
 
 def canonicalize_df(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
+    # ... (giữ nguyên nội dung hàm canonicalize_df)
     if df is None or df.empty:
         return pd.DataFrame()
     new_cols = {}
@@ -46,6 +51,7 @@ def canonicalize_df(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
     return df.rename(columns=new_cols)
 
 def coalesce_series_with_raw(series: pd.Series, prefix="RAW"):
+    # ... (giữ nguyên nội dung hàm coalesce_series_with_raw)
     s = series.copy()
     s = s.astype(str)
     null_mask = s.isna() | s.str.strip().eq("") | s.str.lower().eq("nan")
@@ -55,6 +61,7 @@ def coalesce_series_with_raw(series: pd.Series, prefix="RAW"):
     return s
 
 def to_number(x):
+    # ... (giữ nguyên nội dung hàm to_number)
     if pd.isna(x): return np.nan
     if isinstance(x, (int, float, np.number)): return float(x)
     try: return float(str(x).replace(",", "").replace(" ", ""))
@@ -64,27 +71,30 @@ def to_number(x):
         except: return np.nan
 
 def safe_date(series: pd.Series):
+    # ... (giữ nguyên nội dung hàm safe_date)
     try: return pd.to_datetime(series, errors="coerce")
     except Exception: return pd.to_datetime(pd.Series([None]*len(series)), errors="coerce")
 
 def format_vnd(n):
+    # ... (giữ nguyên nội dung hàm format_vnd)
     if pd.isna(n): return "—"
     n = float(n)
     if abs(n) >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ ₫"
-    if abs(n) >= 1_000_000_000:     return f"{n/1_000_000_000:.2f} tỷ ₫"
-    if abs(n) >= 1_000_000:         return f"{n/1_000_000:.2f} triệu ₫"
+    if abs(n) >= 1_000_000_000:       return f"{n/1_000_000_000:.2f} tỷ ₫"
+    if abs(n) >= 1_000_000:           return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
 # ==============================
 # Theme + CSS
+# ... (giữ nguyên đoạn CSS và hàm info_card)
 # ==============================
 
 st.markdown("""
 <style>
 :root { --label-color: #1f6feb; }
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-  white-space: pre-wrap !important;
-  word-break: break-word !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
 }
 .info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
@@ -108,6 +118,7 @@ def info_card(label, value):
 
 # ==============================
 # Column mappings
+# ... (giữ nguyên COL_MAP)
 # ==============================
 
 COL_MAP = {
@@ -152,9 +163,19 @@ COL_MAP = {
     }
 }
 
+
 # ==============================
 # Sidebar (Upload + Filters)
 # ==============================
+
+# Khai báo biến toàn cục/session state cho dataframes
+df_docs = pd.DataFrame()
+df_over = pd.DataFrame()
+df_find = pd.DataFrame()
+df_act  = pd.DataFrame()
+f_df = pd.DataFrame()
+all_refs = []
+selected_refs = []
 
 with st.sidebar:
     st.header("📤 Tải dữ liệu")
@@ -165,6 +186,11 @@ st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
+    # --- [GEMINI CHAT] ---
+    st.sidebar.markdown("---")
+    # Khung chat sẽ vẫn hiển thị ngay cả khi chưa có data
+    gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, True) 
+    # ---------------------
     st.stop()
 
 data = load_excel(uploaded)
@@ -182,6 +208,10 @@ df_act  = get_df("actions")
 
 if df_docs.empty or df_over.empty or df_find.empty:
     st.error("Thiếu một trong các sheet bắt buộc: documents, overalls, findings.")
+    # --- [GEMINI CHAT] ---
+    st.sidebar.markdown("---")
+    gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, True)
+    # ---------------------
     st.stop()
 
 # Dates
@@ -209,8 +239,13 @@ st.sidebar.markdown("---")
 st.sidebar.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
 st.sidebar.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
 
+# --- [GEMINI CHAT] ---
+gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, False)
+# ---------------------
+
 # ==============================
 # Tabs
+# ... (giữ nguyên nội dung các tabs)
 # ==============================
 
 tab_docs, tab_over, tab_find, tab_act = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions"])
@@ -369,3 +404,90 @@ with tab_act:
         st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
 
 st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
+
+
+# ==============================
+# GEMINI CHAT SIDEBAR LOGIC
+# ==============================
+
+def gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, no_data):
+    """Thêm khung chat Gemini vào sidebar."""
+    st.header("🤖 Trợ lý Gemini (Chat)")
+    
+    if "GEMINI_API_KEY" not in st.secrets:
+        st.warning("Vui lòng thiết lập GEMINI_API_KEY trong file .streamlit/secrets.toml")
+        return
+
+    # Khởi tạo client Gemini
+    try:
+        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    except Exception as e:
+        st.error(f"Lỗi khởi tạo Gemini Client: {e}")
+        return
+
+    # Khởi tạo lịch sử chat
+    if "gemini_chat_history" not in st.session_state:
+        # Hệ thống prompt ban đầu để cung cấp ngữ cảnh về ứng dụng
+        initial_prompt = (
+            "Bạn là một trợ lý phân tích dữ liệu chuyên nghiệp, am hiểu về các Kết luận Thanh tra (KLTT). "
+            "Người dùng đang xem Dashboard KLTT. "
+            "Hãy trả lời các câu hỏi liên quan đến phân tích dữ liệu, ý nghĩa của các chỉ số (nếu có dữ liệu) hoặc tư vấn về cách sử dụng dashboard. "
+            "Hạn chế đưa ra các câu trả lời quá dài. Nếu không biết, hãy nói rõ bạn không có thông tin."
+        )
+        # Sử dụng mô hình gemini-2.5-flash cho tốc độ và hiệu suất tốt trong hội thoại
+        st.session_state.gemini_chat_history = client.chats.create(
+            model="gemini-2.5-flash",
+            system_instruction=initial_prompt
+        )
+
+    chat = st.session_state.gemini_chat_history
+
+    # Thêm thông tin ngữ cảnh dữ liệu hiện tại vào lịch sử chat (nhưng không hiển thị)
+    # Cung cấp cho mô hình các DataFrame dưới dạng tóm tắt hoặc chuỗi
+    context_data = ""
+    if not no_data:
+        context_data = (
+            "NGỮ CẢNH DỮ LIỆU HIỆN TẠI (Tóm tắt DataFrames đã tải):\n"
+            f"1. Documents: {len(df_docs)} báo cáo, các cột: {list(df_docs.columns)}\n"
+            f"2. Overalls: {len(df_over)} hàng, Tổng Nợ xấu: {format_vnd(df_over['npl_total_vnd'].sum() if 'npl_total_vnd' in df_over.columns else np.nan)}\n"
+            f"3. Findings (đã lọc): {len(f_df)} phát hiện, Tổng tiền ảnh hưởng: {format_vnd(f_df['quantified_amount'].sum() if 'quantified_amount' in f_df.columns else np.nan)}, "
+            f"Các Category chính: {f_df['category'].unique().tolist() if 'category' in f_df.columns else []}\n"
+            f"4. Actions: {len(df_act)} biện pháp (nếu có).\n"
+            "Hãy sử dụng thông tin này để đưa ra câu trả lời chính xác hơn về dữ liệu.\n"
+        )
+    else:
+        context_data = "KHÔNG CÓ DỮ LIỆU ĐƯỢC TẢI. Chỉ trả lời các câu hỏi chung về Dashboard."
+
+    # Lấy lịch sử tin nhắn từ session state (loại bỏ tin nhắn hệ thống)
+    display_messages = [
+        {"role": msg.role, "content": msg.parts[0].text} 
+        for msg in chat.get_history() 
+        if msg.role in ["user", "model"]
+    ]
+
+    # Hiển thị lịch sử chat
+    for message in display_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Xử lý input người dùng
+    user_prompt = st.chat_input("Hỏi Gemini về dashboard hoặc dữ liệu...", key="gemini_chat_input")
+
+    if user_prompt:
+        # Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
+        with st.chat_message("user"):
+            st.markdown(user_prompt)
+
+        # Kết hợp ngữ cảnh dữ liệu vào prompt thực gửi đi
+        full_prompt = context_data + "\n" + user_prompt
+
+        # Gọi API Gemini
+        with st.chat_message("assistant"):
+            with st.spinner("Gemini đang suy nghĩ..."):
+                try:
+                    # Gửi tin nhắn đến mô hình chat
+                    response = chat.send_message(full_prompt)
+                    st.markdown(response.text)
+                except Exception as e:
+                    st.error(f"Lỗi khi gọi Gemini API: {e}. Vui lòng kiểm tra API Key và quyền truy cập.")
+                    # Nếu lỗi, không cập nhật lịch sử chat để tránh tin nhắn lỗi làm hỏng luồng
