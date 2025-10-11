@@ -22,12 +22,10 @@ st.set_page_config(
 
 # ==============================
 # Helpers
-# ... (giữ nguyên các hàm helpers như cũ)
 # ==============================
 
 @st.cache_data(show_spinner=False)
 def load_excel(uploaded_file: io.BytesIO) -> dict:
-    # ... (giữ nguyên nội dung hàm load_excel)
     xls = pd.ExcelFile(uploaded_file, engine="openpyxl")
     sheets = {s.lower().strip(): s for s in xls.sheet_names}
     out = {}
@@ -38,7 +36,6 @@ def load_excel(uploaded_file: io.BytesIO) -> dict:
     return out
 
 def canonicalize_df(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
-    # ... (giữ nguyên nội dung hàm canonicalize_df)
     if df is None or df.empty:
         return pd.DataFrame()
     new_cols = {}
@@ -51,7 +48,6 @@ def canonicalize_df(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
     return df.rename(columns=new_cols)
 
 def coalesce_series_with_raw(series: pd.Series, prefix="RAW"):
-    # ... (giữ nguyên nội dung hàm coalesce_series_with_raw)
     s = series.copy()
     s = s.astype(str)
     null_mask = s.isna() | s.str.strip().eq("") | s.str.lower().eq("nan")
@@ -61,7 +57,6 @@ def coalesce_series_with_raw(series: pd.Series, prefix="RAW"):
     return s
 
 def to_number(x):
-    # ... (giữ nguyên nội dung hàm to_number)
     if pd.isna(x): return np.nan
     if isinstance(x, (int, float, np.number)): return float(x)
     try: return float(str(x).replace(",", "").replace(" ", ""))
@@ -71,12 +66,10 @@ def to_number(x):
         except: return np.nan
 
 def safe_date(series: pd.Series):
-    # ... (giữ nguyên nội dung hàm safe_date)
     try: return pd.to_datetime(series, errors="coerce")
     except Exception: return pd.to_datetime(pd.Series([None]*len(series)), errors="coerce")
 
 def format_vnd(n):
-    # ... (giữ nguyên nội dung hàm format_vnd)
     if pd.isna(n): return "—"
     n = float(n)
     if abs(n) >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ ₫"
@@ -86,7 +79,6 @@ def format_vnd(n):
 
 # ==============================
 # Theme + CSS
-# ... (giữ nguyên đoạn CSS và hàm info_card)
 # ==============================
 
 st.markdown("""
@@ -118,7 +110,6 @@ def info_card(label, value):
 
 # ==============================
 # Column mappings
-# ... (giữ nguyên COL_MAP)
 # ==============================
 
 COL_MAP = {
@@ -168,7 +159,7 @@ COL_MAP = {
 # Sidebar (Upload + Filters)
 # ==============================
 
-# Khai báo biến toàn cục/session state cho dataframes
+# Khai báo/Khởi tạo các biến DataFrame ở phạm vi toàn cục (TRƯỚC khi gọi hàm gemini_chat_sidebar() lần đầu)
 df_docs = pd.DataFrame()
 df_over = pd.DataFrame()
 df_find = pd.DataFrame()
@@ -176,6 +167,7 @@ df_act  = pd.DataFrame()
 f_df = pd.DataFrame()
 all_refs = []
 selected_refs = []
+
 
 with st.sidebar:
     st.header("📤 Tải dữ liệu")
@@ -188,10 +180,12 @@ if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
     # --- [GEMINI CHAT] ---
     st.sidebar.markdown("---")
-    # Khung chat sẽ vẫn hiển thị ngay cả khi chưa có data
+    # LƯU Ý: Lần gọi này sẽ sử dụng các DataFrame rỗng đã được khởi tạo ở trên
     gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, True) 
     # ---------------------
     st.stop()
+
+# --- CODE CHỈ CHẠY KHI CÓ FILE ĐƯỢC UPLOAD ---
 
 data = load_excel(uploaded)
 
@@ -240,12 +234,12 @@ st.sidebar.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["
 st.sidebar.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
 
 # --- [GEMINI CHAT] ---
+# Lần gọi này sử dụng các DataFrame đã được điền dữ liệu
 gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, False)
 # ---------------------
 
 # ==============================
 # Tabs
-# ... (giữ nguyên nội dung các tabs)
 # ==============================
 
 tab_docs, tab_over, tab_find, tab_act = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions"])
@@ -420,7 +414,8 @@ def gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, no_data):
 
     # Khởi tạo client Gemini
     try:
-        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+        # Sử dụng genai.Client()
+        client = genai.Client(api_key=st.secrets["AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc"])
     except Exception as e:
         st.error(f"Lỗi khởi tạo Gemini Client: {e}")
         return
@@ -445,13 +440,17 @@ def gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, no_data):
     # Thêm thông tin ngữ cảnh dữ liệu hiện tại vào lịch sử chat (nhưng không hiển thị)
     # Cung cấp cho mô hình các DataFrame dưới dạng tóm tắt hoặc chuỗi
     context_data = ""
-    if not no_data:
+    if not no_data and not df_find.empty:
+        # Chỉ tính tổng nếu cột tồn tại và không rỗng
+        npl_total = df_over['npl_total_vnd'].sum() if 'npl_total_vnd' in df_over.columns and not df_over.empty else np.nan
+        quantified_amount = f_df['quantified_amount'].sum() if 'quantified_amount' in f_df.columns and not f_df.empty else np.nan
+        
         context_data = (
             "NGỮ CẢNH DỮ LIỆU HIỆN TẠI (Tóm tắt DataFrames đã tải):\n"
             f"1. Documents: {len(df_docs)} báo cáo, các cột: {list(df_docs.columns)}\n"
-            f"2. Overalls: {len(df_over)} hàng, Tổng Nợ xấu: {format_vnd(df_over['npl_total_vnd'].sum() if 'npl_total_vnd' in df_over.columns else np.nan)}\n"
-            f"3. Findings (đã lọc): {len(f_df)} phát hiện, Tổng tiền ảnh hưởng: {format_vnd(f_df['quantified_amount'].sum() if 'quantified_amount' in f_df.columns else np.nan)}, "
-            f"Các Category chính: {f_df['category'].unique().tolist() if 'category' in f_df.columns else []}\n"
+            f"2. Overalls: {len(df_over)} hàng, Tổng Nợ xấu: {format_vnd(npl_total)}\n"
+            f"3. Findings (đã lọc): {len(f_df)} phát hiện, Tổng tiền ảnh hưởng: {format_vnd(quantified_amount)}, "
+            f"Các Category chính: {f_df['category'].dropna().unique().tolist() if 'category' in f_df.columns and not f_df.empty else []}\n"
             f"4. Actions: {len(df_act)} biện pháp (nếu có).\n"
             "Hãy sử dụng thông tin này để đưa ra câu trả lời chính xác hơn về dữ liệu.\n"
         )
@@ -459,6 +458,7 @@ def gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, no_data):
         context_data = "KHÔNG CÓ DỮ LIỆU ĐƯỢC TẢI. Chỉ trả lời các câu hỏi chung về Dashboard."
 
     # Lấy lịch sử tin nhắn từ session state (loại bỏ tin nhắn hệ thống)
+    # Lấy lịch sử chat từ đối tượng chat hiện tại
     display_messages = [
         {"role": msg.role, "content": msg.parts[0].text} 
         for msg in chat.get_history() 
@@ -490,4 +490,3 @@ def gemini_chat_sidebar(df_docs, df_over, df_find, df_act, f_df, no_data):
                     st.markdown(response.text)
                 except Exception as e:
                     st.error(f"Lỗi khi gọi Gemini API: {e}. Vui lòng kiểm tra API Key và quyền truy cập.")
-                    # Nếu lỗi, không cập nhật lịch sử chat để tránh tin nhắn lỗi làm hỏng luồng
