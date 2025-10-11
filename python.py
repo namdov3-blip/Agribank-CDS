@@ -1,3 +1,4 @@
+
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
@@ -9,7 +10,6 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -71,8 +71,8 @@ def format_vnd(n):
     if pd.isna(n): return "—"
     n = float(n)
     if abs(n) >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ ₫"
-    if abs(n) >= 1_000_000_000:       return f"{n/1_000_000_000:.2f} tỷ ₫"
-    if abs(n) >= 1_000_000:           return f"{n/1_000_000:.2f} triệu ₫"
+    if abs(n) >= 1_000_000_000:     return f"{n/1_000_000_000:.2f} tỷ ₫"
+    if abs(n) >= 1_000_000:         return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
 # ==============================
@@ -83,8 +83,8 @@ st.markdown("""
 <style>
 :root { --label-color: #1f6feb; }
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
 }
 .info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
@@ -153,57 +153,15 @@ COL_MAP = {
 }
 
 # ==============================
-# Sidebar (Upload + Filters + Chatbot URLs + Embedded Chats)
+# Sidebar (Upload + Filters)
 # ==============================
 
 with st.sidebar:
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
-    
-    st.markdown("---")
-    st.subheader("🤖 Cấu hình Chatbot URLs")
-    default_rag = st.secrets.get("RAG_BOT_URL", "") if hasattr(st, "secrets") else ""
-    default_gem = st.secrets.get("GEMINI_BOT_URL", "") if hasattr(st, "secrets") else ""
-    rag_url = st.text_input("N8N RAG Bot URL", value=default_rag, placeholder="https://your-n8n-domain/webhook/xxxx")
-    gem_url = st.text_input("Gemini Chatbot URL", value=default_gem, placeholder="https://your-gemini-chat-url")
-    st.session_state["rag_url"] = rag_url
-    st.session_state["gem_url"] = gem_url
-    
-    # --- Khung chat nhúng trong Sidebar ---
-    
-    st.markdown("---")
-    
-    # Khung chat Gemini
-    st.subheader("✨ Hỏi đáp với Gemini")
-    if st.session_state.get("gem_url"):
-        # Độ cao (height) được điều chỉnh phù hợp với Sidebar.
-        # Chiều rộng (width) 100% là mặc định cho sidebar.
-        components.html(
-            f'<iframe src="{st.session_state["gem_url"]}" width="100%" height="400" style="border:0; padding: 0;"></iframe>',
-            height=400
-        )
-    else:
-        st.info("Chưa có URL Gemini. Vui lòng nhập URL.")
-
-    st.markdown("---")
-
-    # Khung chat RAG (n8n)
-    st.subheader("💬 Hỏi đáp với RAG Bot (n8n)")
-    if st.session_state.get("rag_url"):
-        components.html(
-            f'<iframe src="{st.session_state["rag_url"]}" width="100%" height="400" style="border:0; padding: 0;"></iframe>',
-            height=400
-        )
-    else:
-        st.info("Chưa có URL RAG Bot. Vui lòng nhập URL.")
-
 
 st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
-
-# Xóa các nút Chatbot góc trên bên phải để tập trung vào Sidebar
-# btn_c1, btn_c2, btn_c3 = st.columns([1,0.22,0.22])
-# ... (đoạn mã đã bị xóa)
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
@@ -241,13 +199,23 @@ for c in ["quantified_amount","impacted_accounts"]:
 df_find["legal_reference_filter"] = coalesce_series_with_raw(df_find["legal_reference"], prefix="RAW")
 df_find["legal_reference_chart"] = df_find["legal_reference_filter"].apply(lambda x: "RAW" if str(x).startswith("RAW") else x)
 
+# Sidebar filter (findings only)
+st.sidebar.header("🔎 Lọc Findings")
+all_refs = sorted(df_find["legal_reference_filter"].astype(str).unique().tolist())
+selected_refs = st.sidebar.multiselect("Chọn Legal_reference", options=all_refs, default=all_refs)
+f_df = df_find[df_find["legal_reference_filter"].astype(str).isin([str(x) for x in selected_refs])].copy()
+
+st.sidebar.markdown("---")
+st.sidebar.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
+st.sidebar.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
+
 # ==============================
-# Tabs (Removed dedicated Chatbot tab, as they are now in the sidebar)
+# Tabs
 # ==============================
-# Đã loại bỏ tab_chat
+
 tab_docs, tab_over, tab_find, tab_act = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions"])
 
-# ---- Documents (render all docs) ----
+# ---- Documents (no dropdown; render all docs) ----
 with tab_docs:
     st.header("Báo Cáo Kết Luận Thanh Tra (Metadata)")
     st.markdown("---")
@@ -299,10 +267,7 @@ with tab_over:
 # ---- Findings ----
 with tab_find:
     st.header("Phát hiện & Nguyên nhân (Findings)")
-    all_refs = sorted(df_find["legal_reference_filter"].astype(str).unique().tolist())
-    selected_refs = st.multiselect("Chọn Legal_reference", options=all_refs, default=all_refs, help="Áp dụng cho tất cả biểu đồ/bảng trong tab này.")
-    f_df = df_find[df_find["legal_reference_filter"].astype(str).isin([str(x) for x in selected_refs])].copy()
-
+    st.subheader(f"Đang lọc theo: {len(selected_refs)}/{len(all_refs)} legal_reference")
     st.markdown("---")
     if f_df.empty:
         st.warning("Không có dữ liệu theo bộ lọc hiện tại.")
@@ -326,9 +291,7 @@ with tab_find:
 
         st.markdown("---")
         st.subheader("Xu hướng theo Legal_reference (gộp RAWx → RAW)")
-        legal_count = f_df.copy()
-        legal_count["legal_chart"] = legal_count["legal_reference_filter"].apply(lambda x: "RAW" if str(x).startswith("RAW") else x)
-        legal_count = legal_count["legal_chart"].value_counts().reset_index()
+        legal_count = f_df["legal_reference_chart"].value_counts().reset_index()
         legal_count.columns = ["Legal_reference","Count"]
         fig3 = px.line(legal_count, x="Legal_reference", y="Count", markers=True,
                        title="Số lần xuất hiện theo Legal_reference (gộp RAWx→RAW)")
@@ -339,7 +302,7 @@ with tab_find:
         st.subheader("Tần suất từng Legal_reference (không gộp phụ lục/điểm khoản)")
         freq_tbl = f_df["legal_reference_filter"].value_counts().reset_index()
         freq_tbl.columns = ["Legal_reference","Số lần"]
-        st.dataframe(freq_tbl, use_container_width=True, height=300)
+        st.dataframe(freq_tbl, use_container_width=True, height=320)
 
         st.markdown("---")
         st.subheader("Chi tiết theo từng Sub_category")
@@ -347,7 +310,7 @@ with tab_find:
         for sub in order_sub:
             st.markdown(f"#### 🔹 {sub}")
             sub_df = f_df[f_df["sub_category"]==sub].copy()
-            sub_df["legal_reference"] = sub_df["legal_reference_filter"]  # đảm bảo RAWx hiển thị
+            sub_df["legal_reference"] = sub_df["legal_reference_filter"]  # đảm bảo RAWx hiển thị trực tiếp
             cols_show = [c for c in ["description","legal_reference","quantified_amount","impacted_accounts","root_cause"] if c in sub_df.columns]
             sub_df = sub_df[cols_show]
             if "quantified_amount" in sub_df.columns:
@@ -364,7 +327,8 @@ with tab_find:
             st.dataframe(sub_df.rename(columns=rename), use_container_width=True)
 
         st.markdown("---")
-        st.subheader("Phân tích theo bộ luật")
+        st.subheader("Phân tích theo bộ luật")  # renamed
+        # Show unique combos only (no counts / sums)
         tmp = f_df.copy()
         tmp["legal_reference"] = tmp["legal_reference_filter"]
         cols = ["legal_reference"]
@@ -378,7 +342,7 @@ with tab_find:
         })
         st.dataframe(law_tbl, use_container_width=True)
 
-# ---- Actions ----
+# ---- Actions (show ALL rows, no filtering by findings) ----
 with tab_act:
     st.header("Biện pháp khắc phục (Actions)")
     st.markdown("---")
@@ -404,8 +368,4 @@ with tab_act:
         }
         st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
 
-# ---- Chatbot Tab (Removed) ----
-# with tab_chat:
-#    ... (đoạn mã đã bị xóa)
-
-st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly • n8n RAG • Gemini")
+st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
