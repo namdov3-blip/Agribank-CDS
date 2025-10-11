@@ -252,8 +252,8 @@ def rag_chat_tab():
 # ==============================
 
 def _get_gemini_model_name():
-    # Cho phép override qua secrets; mặc định dùng Gemini 1.5 Pro
-    return st.secrets.get("GEMINI_MODEL", "models/gemini-1.5-pro")
+    # Cho phép override qua secrets; mặc định dùng Gemini 2.5 Pro
+    return st.secrets.get("GEMINI_MODEL", "models/gemini-2.5-pro")
 
 def call_gemini(messages: list):
     """
@@ -346,7 +346,7 @@ def gemini_chat_tab():
 # .streamlit/secrets.toml
 GEMINI_API_KEY = "your_api_key_here"
 # Tùy chọn: đổi model
-# GEMINI_MODEL = "models/gemini-1.5-flash"  # hoặc models/gemini-1.5-pro
+# GEMINI_MODEL = "models/gemini-2.5-flash"  # hoặc models/gemini-2.5-pro
             """.strip(),
             language="toml"
         )
