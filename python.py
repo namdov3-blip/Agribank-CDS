@@ -1,7 +1,7 @@
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
-# Yêu cầu: pip install streamlit pandas altair openpyxl plotly requests google-genai
+# Yêu cầu: pip install streamlit pandas altair openpyxl plotly requests
 
 import io
 import numpy as np
@@ -9,15 +9,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-import requests  # Cho RAG Webhook
-
-# Thêm thư viện Google GenAI (SDK chính thức)
-try:
-    from google import genai
-    from google.genai import types
-    GEMINI_AVAILABLE = True
-except ImportError:
-    GEMINI_AVAILABLE = False
+import requests # THÊM MỚI: Thư viện để gọi n8n Webhook
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -27,7 +19,7 @@ st.set_page_config(
 )
 
 # ==============================
-# Helpers
+# Helpers (GIỮ NGUYÊN)
 # ==============================
 
 @st.cache_data(show_spinner=False)
@@ -83,7 +75,7 @@ def format_vnd(n):
     if abs(n) >= 1_000_000: return f"{n/1_000_000:.2f} triệu ₫"
     return f"{n:,.0f} ₫"
 
-# ===== Plot helpers for Overalls =====
+# ===== Plot helpers for Overalls (GIỮ NGUYÊN) =====
 PALETTE = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#0ea5e9", "#a855f7", "#22c55e", "#e11d48", "#6b7280"]
 
 def _format_vnd_text(v):
@@ -134,7 +126,7 @@ def make_pie(labels_vals, title="", height=260):
     return fig
 
 # ==============================
-# Theme + CSS
+# Theme + CSS (GIỮ NGUYÊN)
 # ==============================
 
 st.markdown("""
@@ -164,182 +156,130 @@ def info_card(label, value):
         """, unsafe_allow_html=True
     )
 
-# ==========================================================
-# RAG CHAT LOGIC (đã sửa lỗi AttributeError)
-# ==========================================================
+# ==============================
+# RAG CHATBOT LOGIC (CẬP NHẬT)
+# ==============================
 
-def call_rag_api(prompt: str):
-    """Gọi n8n Webhook để giao tiếp với RAG Chatbot."""
+def call_n8n_chatbot(prompt: str):
+    """Gửi câu hỏi tới n8n RAG Webhook và nhận câu trả lời. Bao gồm logic Chat ID."""
     if "N8N_WEBHOOK_URL" not in st.secrets:
-        return "**[LỖI CẤU HÌNH]** Vui lòng thiết lập **N8N_WEBHOOK_URL** trong file .streamlit/secrets.toml để sử dụng Chatbot RAG."
+        return "Lỗi cấu hình: Thiếu N8N_WEBHOOK_URL trong secrets.toml. Vui lòng thiết lập để sử dụng chatbot."
+    
     webhook_url = st.secrets["N8N_WEBHOOK_URL"]
+    
+    # Logic tạo/lấy Chat ID để n8n quản lý bộ nhớ (Simple Memory)
+    if "chat_session_id" not in st.session_state:
+        # Tạo ID duy nhất dựa trên timestamp
+        st.session_state.chat_session_id = pd.Timestamp.now().strftime("%Y%m%d%H%M%S%f")
+
+    payload = {
+        "query": prompt,
+        "chatId": st.session_state.chat_session_id # Truyền Chat ID
+    }
+    
     try:
-        response = requests.post(webhook_url, json={"chatInput": prompt}, timeout=120)
+        # Tăng timeout lên 90s để tránh lỗi hết thời gian chờ
+        response = requests.post(webhook_url, json=payload, timeout=90)
         response.raise_for_status()
-        return response.text.strip()
-    except requests.exceptions.HTTPError as e:
-        return f"**[LỖI HTTP]** {e}. Phản hồi: {response.text if 'response' in locals() else '—'}"
+        data = response.json()
+        
+        return data.get("response", "Không tìm thấy trường 'response' trong phản hồi của n8n. Vui lòng kiểm tra lại cấu hình n8n.")
+
+    except requests.exceptions.Timeout:
+        return "RAG Chatbot (n8n) hết thời gian chờ (Timeout: 90s). Vui lòng thử lại hoặc rút gọn câu hỏi."
     except requests.exceptions.RequestException as e:
-        return f"**[LỖI KẾT NỐI]** {e}"
+        return f"Lỗi kết nối tới n8n: {e}. Vui lòng kiểm tra URL Webhook và trạng thái n8n."
+    except Exception as e:
+        return f"Lỗi xử lý phản hồi từ n8n: {e}"
 
 def reset_rag_chat_session():
-    """Reset toàn bộ lịch sử & biến đếm cho RAG bot."""
+    """Hàm này sẽ reset toàn bộ lịch sử chat và session ID."""
+    
+    # 1. Reset lịch sử chat
     st.session_state.rag_chat_history = []
-    st.session_state.rag_chat_counter = 0
-    st.session_state.rag_chat_history.append(
-        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset**. Tôi là RAG Chatbot, hãy hỏi tôi về dữ liệu KLTT."}
-    )
-    st.rerun()
-
-def rag_chat_tab():
-    """Khung chat RAG trong tab riêng."""
-    st.header("🤖 Chat với RAG Chatbot (Dựa trên Dữ liệu KLTT)")
-
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử RAG)", key="rag_reset_button", type="primary"):
-        reset_rag_chat_session()
-        return
-
-    # ✅ Khởi tạo an toàn để tránh AttributeError
-    if "rag_chat_history" not in st.session_state:
-        st.session_state.rag_chat_history = [{"role": "assistant", "content": "Chào bạn, tôi là RAG Chatbot. Hãy hỏi tôi về dữ liệu KLTT."}]
-    if "rag_chat_counter" not in st.session_state:
+    
+    # 2. Reset biến đếm
+    if "rag_chat_counter" in st.session_state:
         st.session_state.rag_chat_counter = 0
 
+    # 3. Reset ID phiên chat (quan trọng để n8n cũng quên lịch sử)
+    if "chat_session_id" in st.session_state:
+        del st.session_state.chat_session_id
+    
+    # 4. Thêm tin nhắn chào mừng mới
+    st.session_state.rag_chat_history.append(
+        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Chào bạn, tôi là Trợ lý RAG được kết nối qua n8n. Hãy hỏi tôi về các thông tin KLTT."}
+    )
+    
+    # Dùng st.rerun() để làm mới giao diện ngay lập tức
+    st.rerun()
+
+
+def rag_chat_tab():
+    """Thêm khung chat RAG kết nối qua n8n Webhook vào tab."""
+    st.header("🤖 Trợ lý RAG (Hỏi & Đáp Dữ liệu KLTT)")
+    
+    # Đặt nút Reset thủ công
+    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử)", type="primary"):
+        reset_rag_chat_session()
+        # Hàm đã gọi st.rerun(), nên code không chạy tiếp
+        return 
+
+    # 1. KHỞI TẠO BIẾN ĐẾM & LỊCH SỬ CHAT
+    if "rag_chat_history" not in st.session_state:
+        st.session_state.rag_chat_history = []
+        st.session_state.rag_chat_counter = 0
+        st.session_state.rag_chat_history.append(
+            {"role": "assistant", "content": "Chào bạn, tôi là Trợ lý RAG được kết nối qua n8n. Hãy hỏi tôi về các thông tin KLTT."}
+        )
+    
     current_count = st.session_state.get("rag_chat_counter", 0)
     st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
+
     st.markdown("---")
 
+    # Kiểm tra URL Webhook
     if "N8N_WEBHOOK_URL" not in st.secrets:
-        st.warning("Vui lòng thiết lập N8N_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot RAG.")
+        st.warning("Vui lòng thiết lập N8N_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot.")
+        return
 
     # Hiển thị lịch sử chat
     for message in st.session_state.rag_chat_history:
-        avatar = "🤖" if message["role"] == "assistant" else "👤"
-        with st.chat_message(message["role"], avatar=avatar):
+        with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Xử lý input + logic reset tự động
-    user_prompt = st.chat_input("Hỏi RAG Chatbot...", key="rag_chat_input")
-    if user_prompt:
-        # Nếu đạt 5 câu thì reset ngay trước khi xử lý tiếp
+    # 2. XỬ LÝ INPUT VÀ LOGIC RESET TỰ ĐỘNG
+    if user_prompt := st.chat_input("Hỏi Trợ lý RAG...", key="rag_chat_input"):
+        
+        # KIỂM TRA VÀ RESET PHIÊN CHAT (Tự động sau 5 câu)
         if st.session_state.rag_chat_counter >= 5:
-            with st.chat_message("assistant", avatar="🤖"):
-                st.info("Phiên RAG đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
+            # Gửi thông báo reset (hiển thị trong phiên cũ trước khi reset)
+            with st.chat_message("assistant"):
+                st.info("Phiên trò chuyện đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
+            
+            # Thực hiện reset và st.rerun()
             reset_rag_chat_session()
             return
 
+        # 1. Thêm prompt người dùng vào lịch sử và hiển thị ngay lập tức
         st.session_state.rag_chat_history.append({"role": "user", "content": user_prompt})
-        with st.chat_message("user", avatar="👤"):
+        with st.chat_message("user"):
             st.markdown(user_prompt)
 
-        with st.chat_message("assistant", avatar="🤖"):
-            with st.spinner("RAG Chatbot đang xử lý..."):
-                response_text = call_rag_api(user_prompt)
+        # 2. Gọi API n8n
+        with st.chat_message("assistant"):
+            with st.spinner("RAG Chatbot (n8n) đang xử lý..."):
+                
+                response_text = call_n8n_chatbot(user_prompt)
+                
                 st.markdown(response_text)
-
-        st.session_state.rag_chat_history.append({"role": "assistant", "content": response_text})
-        st.session_state.rag_chat_counter += 1
-
-# ==========================================================
-# GEMINI CHAT LOGIC (tích hợp SDK thực tế)
-# ==========================================================
-
-@st.cache_resource
-def get_gemini_client():
-    if not GEMINI_AVAILABLE:
-        return None
-    if "GEMINI_API_KEY" not in st.secrets:
-        return None
-    try:
-        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-        return client
-    except Exception as e:
-        st.error(f"Lỗi khởi tạo Gemini Client: {e}")
-        return None
-
-def reset_gemini_chat_session():
-    """Reset toàn bộ lịch sử & biến đếm cho Gemini bot."""
-    if "gemini_chat_session" in st.session_state:
-        del st.session_state.gemini_chat_session
-    st.session_state.gemini_chat_history = []
-    st.session_state.gemini_chat_counter = 0
-    st.session_state.gemini_chat_history.append(
-        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset**. Chào bạn, tôi là Gemini (SDK)."}
-    )
-    st.rerun()
-
-def gemini_chat_tab():
-    """Khung chat Gemini trong tab riêng."""
-    st.header("✨ Chat với Gemini (Tích hợp SDK)")
-
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử Gemini)", key="gemini_reset_button", type="primary"):
-        reset_gemini_chat_session()
-        return
-
-    if not GEMINI_AVAILABLE:
-        st.error("Thiếu thư viện `google-genai`. Vui lòng cài: `pip install google-genai`.")
-        return
-
-    client = get_gemini_client()
-    if client is None:
-        st.warning("Vui lòng thiết lập GEMINI_API_KEY trong file .streamlit/secrets.toml để dùng Gemini.")
-        return
-
-    # Tạo chat session nếu chưa có
-    if "gemini_chat_session" not in st.session_state:
-        system_instruction = "You are a friendly and helpful assistant. Respond to all queries in Vietnamese. Keep your answers concise."
-        config = types.GenerateContentConfig(system_instruction=system_instruction)
-        try:
-            st.session_state.gemini_chat_session = client.chats.create(
-                model="gemini-2.5-flash",
-                config=config
-            )
-        except Exception as e:
-            st.error(f"Lỗi tạo Gemini Chat Session: {e}. Vui lòng kiểm tra API Key/model.")
-            st.stop()
-
-    # Lịch sử UI
-    if "gemini_chat_history" not in st.session_state:
-        st.session_state.gemini_chat_history = [{"role": "assistant", "content": "Chào bạn, tôi là Gemini. Hãy hỏi tôi về mọi thứ."}]
-        st.session_state.gemini_chat_counter = 0
-
-    current_count = st.session_state.get("gemini_chat_counter", 0)
-    st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
-    st.markdown("---")
-
-    # Hiển thị lịch sử chat
-    for message in st.session_state.gemini_chat_history:
-        avatar = "✨" if message["role"] == "assistant" else "👤"
-        with st.chat_message(message["role"], avatar=avatar):
-            st.markdown(message["content"])
-
-    # Xử lý input + reset tự động
-    user_prompt = st.chat_input("Hỏi Gemini...", key="gemini_chat_input")
-    if user_prompt:
-        if st.session_state.gemini_chat_counter >= 5:
-            with st.chat_message("assistant", avatar="✨"):
-                st.info("Phiên Gemini đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
-            reset_gemini_chat_session()
-            return
-
-        st.session_state.gemini_chat_history.append({"role": "user", "content": user_prompt})
-        with st.chat_message("user", avatar="👤"):
-            st.markdown(user_prompt)
-
-        with st.chat_message("assistant", avatar="✨"):
-            with st.spinner("Gemini đang xử lý..."):
-                try:
-                    response = st.session_state.gemini_chat_session.send_message(user_prompt)
-                    response_text = response.text
-                except Exception as e:
-                    response_text = f"**[LỖI GEMINI]** Không thể nhận phản hồi: {e}"
-                st.markdown(response_text)
-
-        st.session_state.gemini_chat_history.append({"role": "assistant", "content": response_text})
-        st.session_state.gemini_chat_counter += 1
+                
+                # 3. Cập nhật lịch sử chat với câu trả lời VÀ TĂNG BIẾN ĐẾM
+                st.session_state.rag_chat_history.append({"role": "assistant", "content": response_text})
+                st.session_state.rag_chat_counter += 1
 
 # ==============================
-# Column mappings
+# Column mappings (GIỮ NGUYÊN)
 # ==============================
 
 COL_MAP = {
@@ -366,6 +306,7 @@ COL_MAP = {
         "sample_total_files": ["sample_total_files"],
         "sample_outstanding_checked_vnd": ["sample_outstanding_checked_vnd"],
 
+        # Bổ sung theo yêu cầu phần biểu đồ
         "structure_quality_group1_vnd": ["structure_quality_group1_vnd"],
         "structure_quality_group2_vnd": ["structure_quality_group2_vnd"],
         "structure_quality_group3_vnd": ["structure_quality_group3_vnd"],
@@ -404,8 +345,9 @@ COL_MAP = {
     }
 }
 
+
 # ==============================
-# Sidebar (Upload + Filters)
+# Sidebar (Upload + Filters) (GIỮ NGUYÊN)
 # ==============================
 
 with st.sidebar:
@@ -419,7 +361,8 @@ if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
     st.stop()
 
-# ========== Load & chuẩn hoá ==========
+# ... (Tiếp tục xử lý dữ liệu)
+
 data = load_excel(uploaded)
 
 def get_df(sheet_key):
@@ -452,7 +395,7 @@ for c in ["quantified_amount","impacted_accounts"]:
 df_find["legal_reference_filter"] = coalesce_series_with_raw(df_find["legal_reference"], prefix="RAW")
 df_find["legal_reference_chart"] = df_find["legal_reference_filter"].apply(lambda x: "RAW" if str(x).startswith("RAW") else x)
 
-# Sidebar filter (findings only)
+# Sidebar filter (findings only) (GIỮ NGUYÊN)
 with st.sidebar:
     st.header("🔎 Lọc Findings")
     all_refs = sorted(df_find["legal_reference_filter"].astype(str).unique().tolist())
@@ -463,26 +406,19 @@ with st.sidebar:
     st.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
     st.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
 
+
 # ==============================
-# Tabs (bao gồm RAG & Gemini)
+# Tabs (ĐÃ THÊM TAB CHATBOT)
 # ==============================
 
-tab_docs, tab_over, tab_find, tab_act, tab_rag, tab_gemini = st.tabs([
-    "📝 Documents",
-    "📊 Overalls",
-    "🚨 Findings",
-    "✅ Actions",
-    "🤖 Chatbot RAG",
-    "✨ Gemini (SDK)"
-])
+# THÊM '🤖 Chatbot' VÀO DANH SÁCH TABS
+tab_docs, tab_over, tab_find, tab_act, tab_chat = st.tabs(["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions", "🤖 Chatbot"])
 
-with tab_rag:
+# ---- Chatbot Tab (GỌI HÀM MỚI) ----
+with tab_chat:
     rag_chat_tab()
 
-with tab_gemini:
-    gemini_chat_tab()
-
-# ---- Documents ----
+# ---- Documents (GIỮ NGUYÊN) ----
 with tab_docs:
     st.header("Báo Cáo Kết Luận Thanh Tra (Metadata)")
     st.markdown("---")
@@ -510,7 +446,8 @@ with tab_docs:
                 info_card("Thời gian kết thúc (period_end)", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
             st.markdown("</div>", unsafe_allow_html=True)
 
-# ---- Overalls ----
+
+# ---- Overalls (GIỮ NGUYÊN) ----
 with tab_over:
     st.header("Thông Tin Tổng Quan")
     st.markdown("---")
@@ -601,12 +538,12 @@ with tab_over:
     fig_p = make_bar(dfp, title="Mục đích vay (bar nhỏ)")
     st.plotly_chart(fig_p, use_container_width=True)
 
-    # 5) Thành phần kinh tế
+    # 5) Thành phần kinh tế (luôn hiển thị cả 0)
     st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
         ("DN Nhà nước", "strucuture_econ_state_vnd"),
-        ("DN tổ chức kinh tế", "strucuture_econ_nonstate_enterprises_vnd"),
-        ("DN tư nhân cá thể", "strucuture_econ_individuals_households_vnd"),
+        ("DN tổ chức kinh tế", "structure_econ_nonstate_enterprises_vnd"),
+        ("DN tư nhân cá thể", "structure_econ_individuals_households_vnd"),
     ]
     eco_data = []
     for n, c in eco_items:
@@ -616,7 +553,7 @@ with tab_over:
     fig_e = make_bar(dfe, title="Thành phần kinh tế (bar nhỏ, hiển thị 0)")
     st.plotly_chart(fig_e, use_container_width=True)
 
-# ---- Findings ----
+# ---- Findings (GIỮ NGUYÊN) ----
 with tab_find:
     st.header("Phát hiện & Nguyên nhân (Findings)")
     st.subheader(f"Đang lọc theo: {len(selected_refs)}/{len(all_refs)} legal_reference")
@@ -693,7 +630,7 @@ with tab_find:
         })
         st.dataframe(law_tbl, use_container_width=True)
 
-# ---- Actions ----
+# ---- Actions (GIỮ NGUYÊN) ----
 with tab_act:
     st.header("Biện pháp khắc phục (Actions)")
     st.markdown("---")
