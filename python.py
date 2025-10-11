@@ -1,4 +1,3 @@
-
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
@@ -133,6 +132,32 @@ COL_MAP = {
         "npl_ratio_percent": ["npl_ratio_percent"],
         "sample_total_files": ["sample_total_files"],
         "sample_outstanding_checked_vnd": ["sample_outstanding_checked_vnd"],
+
+        # --- Bổ sung theo yêu cầu ---
+        # Nợ xấu nhóm 3/4/5
+        "npl_group3_vnd": ["npl_group3_vnd"],
+        "npl_group4_vnd": ["npl_group4_vnd"],
+        "npl_group5_vnd": ["npl_group5_vnd"],
+
+        # Cơ cấu kỳ hạn
+        "structure_term_short_vnd": ["structure_term_short_vnd"],
+        "structure_term_medium_long_vnd": ["structure_term_medium_long_vnd"],
+
+        # Cơ cấu tiền tệ
+        "structure_currency_vnd_vnd": ["structure_currency_vnd_vnd"],
+        "structure_currency_fx_vnd": ["structure_currency_fx_vnd"],
+
+        # Cơ cấu mục đích
+        "structure_purpose_bds_flexible_vnd": ["structure_purpose_bds_flexible_vnd"],
+        "strucuture_purpose_securities_vnd": ["strucuture_purpose_securities_vnd"],  # giữ nguyên theo tên bạn đưa
+        "structure_purpose_consumption_vnd": ["structure_purpose_consumption_vnd"],
+        "structure_purpose_trade_vnd": ["structure_purpose_trade_vnd"],
+        "structure_purpose_other_vnd": ["structure_purpose_other_vnd"],
+
+        # Cơ cấu theo thành phần kinh tế
+        "strucuture_econ_state_vnd": ["strucuture_econ_state_vnd"],
+        "strucuture_econ_nonstate_enterprises_vnd": ["strucuture_econ_nonstate_enterprises_vnd"],
+        "strucuture_econ_individuals_households_vnd": ["strucuture_econ_individuals_households_vnd"],
     },
     "findings": {
         "category": ["category"],
@@ -189,7 +214,7 @@ for c in ["issue_date","period_start","period_end"]:
     if c in df_docs.columns:
         df_docs[c] = safe_date(df_docs[c])
 
-# Numeric
+# Numeric (tự động áp dụng cho cột mới ở Overalls)
 for c in COL_MAP["overalls"].keys():
     if c in df_over.columns: df_over[c] = df_over[c].apply(to_number)
 for c in ["quantified_amount","impacted_accounts"]:
@@ -264,6 +289,50 @@ with tab_over:
         st.metric("Tỷ lệ NPL / Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f}%" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
         st.metric("Tổng dư nợ đã kiểm tra", format_vnd(over_row.get("sample_outstanding_checked_vnd", np.nan)))
 
+    # --- Bổ sung hiển thị chi tiết ---
+    st.markdown("### 📌 Nợ xấu theo nhóm (nếu có)")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Nợ xấu nhóm 3", format_vnd(over_row.get("npl_group3_vnd", np.nan)))
+    with c2:
+        st.metric("Nợ xấu nhóm 4", format_vnd(over_row.get("npl_group4_vnd", np.nan)))
+    with c3:
+        st.metric("Nợ xấu nhóm 5", format_vnd(over_row.get("npl_group5_vnd", np.nan)))
+
+    st.markdown("### 🧭 Cơ cấu theo kỳ hạn")
+    t1, t2 = st.columns(2)
+    with t1:
+        st.metric("Dư nợ ngắn hạn", format_vnd(over_row.get("structure_term_short_vnd", np.nan)))
+    with t2:
+        st.metric("Dư nợ trung & dài hạn", format_vnd(over_row.get("structure_term_medium_long_vnd", np.nan)))
+
+    st.markdown("### 💱 Cơ cấu theo tiền tệ")
+    cur1, cur2 = st.columns(2)
+    with cur1:
+        st.metric("Dư nợ bằng VND", format_vnd(over_row.get("structure_currency_vnd_vnd", np.nan)))
+    with cur2:
+        st.metric("Dư nợ quy đổi ngoại tệ", format_vnd(over_row.get("structure_currency_fx_vnd", np.nan)))
+
+    st.markdown("### 🎯 Cơ cấu theo mục đích vay")
+    g1, g2, g3 = st.columns(3)
+    with g1:
+        st.metric("BĐS / linh hoạt", format_vnd(over_row.get("structure_purpose_bds_flexible_vnd", np.nan)))
+        st.metric("Chứng khoán", format_vnd(over_row.get("strucuture_purpose_securities_vnd", np.nan)))
+    with g2:
+        st.metric("Tiêu dùng", format_vnd(over_row.get("structure_purpose_consumption_vnd", np.nan)))
+        st.metric("Thương mại", format_vnd(over_row.get("structure_purpose_trade_vnd", np.nan)))
+    with g3:
+        st.metric("Mục đích khác", format_vnd(over_row.get("structure_purpose_other_vnd", np.nan)))
+
+    st.markdown("### 🧩 Cơ cấu theo thành phần kinh tế")
+    e1, e2, e3 = st.columns(3)
+    with e1:
+        st.metric("DN Nhà nước", format_vnd(over_row.get("strucuture_econ_state_vnd", np.nan)))
+    with e2:
+        st.metric("DN ngoài QD", format_vnd(over_row.get("strucuture_econ_nonstate_enterprises_vnd", np.nan)))
+    with e3:
+        st.metric("Cá nhân/Hộ gia đình", format_vnd(over_row.get("strucuture_econ_individuals_households_vnd", np.nan)))
+
 # ---- Findings ----
 with tab_find:
     st.header("Phát hiện & Nguyên nhân (Findings)")
@@ -298,74 +367,4 @@ with tab_find:
         st.plotly_chart(fig3, use_container_width=True)
         st.info("RAW = luật/quy định không được nhắc tới; ô trống đã gán RAW1, RAW2… và gộp thành RAW cho biểu đồ.")
 
-        st.markdown("---")
-        st.subheader("Tần suất từng Legal_reference (không gộp phụ lục/điểm khoản)")
-        freq_tbl = f_df["legal_reference_filter"].value_counts().reset_index()
-        freq_tbl.columns = ["Legal_reference","Số lần"]
-        st.dataframe(freq_tbl, use_container_width=True, height=320)
-
-        st.markdown("---")
-        st.subheader("Chi tiết theo từng Sub_category")
-        order_sub = f_df["sub_category"].value_counts().index.tolist()
-        for sub in order_sub:
-            st.markdown(f"#### 🔹 {sub}")
-            sub_df = f_df[f_df["sub_category"]==sub].copy()
-            sub_df["legal_reference"] = sub_df["legal_reference_filter"]  # đảm bảo RAWx hiển thị trực tiếp
-            cols_show = [c for c in ["description","legal_reference","quantified_amount","impacted_accounts","root_cause"] if c in sub_df.columns]
-            sub_df = sub_df[cols_show]
-            if "quantified_amount" in sub_df.columns:
-                sub_df["quantified_amount"] = sub_df["quantified_amount"].apply(format_vnd)
-            if "impacted_accounts" in sub_df.columns:
-                sub_df["impacted_accounts"] = sub_df["impacted_accounts"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "—")
-            rename = {
-                "description":"Mô tả",
-                "legal_reference":"Điều luật/Quy định",
-                "quantified_amount":"Số tiền ảnh hưởng",
-                "impacted_accounts":"Số KH/Hồ sơ",
-                "root_cause":"Nguyên nhân gốc"
-            }
-            st.dataframe(sub_df.rename(columns=rename), use_container_width=True)
-
-        st.markdown("---")
-        st.subheader("Phân tích theo bộ luật")  # renamed
-        # Show unique combos only (no counts / sums)
-        tmp = f_df.copy()
-        tmp["legal_reference"] = tmp["legal_reference_filter"]
-        cols = ["legal_reference"]
-        if "root_cause" in tmp.columns: cols.append("root_cause")
-        if "recommendation" in tmp.columns: cols.append("recommendation")
-        law_tbl = tmp[cols].drop_duplicates().reset_index(drop=True)
-        law_tbl = law_tbl.rename(columns={
-            "legal_reference":"Legal_reference",
-            "root_cause":"Root_cause",
-            "recommendation":"Recommendation"
-        })
-        st.dataframe(law_tbl, use_container_width=True)
-
-# ---- Actions (show ALL rows, no filtering by findings) ----
-with tab_act:
-    st.header("Biện pháp khắc phục (Actions)")
-    st.markdown("---")
-    if df_act is None or df_act.empty:
-        st.info("Không có sheet actions hoặc thiếu cột. Cần: action_type, legal_reference, action_description, evidence_of_completion.")
-    else:
-        df_act_full = df_act.copy()
-        df_act_full["Legal_reference"] = coalesce_series_with_raw(df_act_full["legal_reference"], prefix="RAW")
-        # Chart
-        if "action_type" in df_act_full.columns:
-            act_count = df_act_full["action_type"].value_counts().reset_index()
-            act_count.columns = ["Action_type","Count"]
-            fig = px.pie(act_count, values="Count", names="Action_type", title="Phân loại tính chất biện pháp", hole=.35)
-            fig.update_traces(textinfo="percent+label")
-            st.plotly_chart(fig, use_container_width=True)
-        st.markdown("---")
-        # Table (all rows)
-        cols = [c for c in ["Legal_reference","action_type","action_description","evidence_of_completion"] if c in df_act_full.columns or c=="Legal_reference"]
-        rename = {
-            "action_type":"Tính chất biện pháp",
-            "action_description":"Nội dung công việc phải làm",
-            "evidence_of_completion":"Công việc chi tiết / Minh chứng"
-        }
-        st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
-
-st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
+        st.ma
