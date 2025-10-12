@@ -228,7 +228,7 @@ hr {
 button[data-testid^="stTab"] {
     font-size: 20px !important; /* Cỡ chữ lớn hơn */
     font-weight: 1400; /* Làm chữ đậm hơn */
-    padding: 40px 40px; /* Tăng padding để tab to hơn */
+    padding: 10px 20px; /* Tăng padding để tab to hơn */
 }
 /* Tabs Accent */
 button[data-testid^="stTab"]:focus {
