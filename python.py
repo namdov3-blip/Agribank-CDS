@@ -179,22 +179,22 @@ hr {
 
 /* Info Card */
 .info-card { 
-    padding: 10px 12px; 
-    border: 1px solid #e8e8e8; 
+    padding: 30px 20px; 
+    border: 5px solid #e8e8e8; 
     border-left: 5px solid var(--primary-color); /* Điểm nhấn màu chủ đạo */
-    border-radius: 10px; 
+    border-radius: 20px; 
     background: #fff; 
     min-height: 72px; 
     margin-bottom: 10px;
 }
 .info-card .label { 
-    font-size: 12px; 
+    font-size: 20px; 
     color: var(--primary-color); 
     font-weight: 700; 
     margin-bottom: 4px; 
 }
 .info-card .value { 
-    font-size: 16px; 
+    font-size: 20px; 
     line-height: 1.4; 
     white-space: pre-wrap; 
     word-break: break-word; 
