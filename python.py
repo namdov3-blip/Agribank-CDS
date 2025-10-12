@@ -70,7 +70,7 @@ st.markdown("""
 </style>
 
 <div class="header-sbv">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/State_Bank_of_Vietnam_logo.svg" alt="SBV Logo">
+    <img src="nn.pnglogo_nh">
     <div class="sub-title">Dashboard tổng hợp phân tích báo cáo</div>
     <div class="main-title">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</div>
     <div class="bottom-title">DBND</div>
