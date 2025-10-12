@@ -138,74 +138,16 @@ def make_pie(labels_vals, title="", height=260):
     fig.update_layout(height=height, margin=dict(l=10, r=10, t=60, b=10))
     return fig
 
-
 # ==============================
-# Theme + CSS (THÊM ĐOẠN NÀY)
+# Theme + CSS (GIỮ NGUYÊN)
 # ==============================
 
 st.markdown("""
 <style>
 :root { --label-color: #1f6feb; }
-/* THÊM ĐOẠN CSS CHO HEADER TÙY CHỈNH */
-.custom-header {
-    background-color: #FFF8E1; /* Nền màu vàng gold nhẹ */
-    color: #B8860B; /* Màu chữ vàng gold */
-    padding: 20px 10px;
-    border-bottom: 3px solid #B8860B;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    text-align: center;
-}
-
-.custom-header .logo {
-    width: 80px; /* Kích thước logo lớn */
-    height: auto;
-    margin-right: 20px;
-    position: absolute; /* Đặt vị trí tuyệt đối để nằm bên trái */
-    left: 10px;
-}
-
-.custom-header .title-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-}
-
-.custom-header .dashboard-text {
-    font-size: 14px;
-    font-weight: 400;
-    margin-bottom: 5px;
-    letter-spacing: 1px;
-}
-
-.custom-header .main-title {
-    font-size: 30px; /* Chữ to rõ */
-    font-weight: 800;
-    margin: 0;
-    line-height: 1.2;
-}
-
-.custom-header .dbnd-text {
-    font-size: 18px;
-    font-weight: 600;
-    margin-top: 5px;
-}
-
-/* Đảm bảo toàn bộ ứng dụng sử dụng nền trắng (hoặc bỏ qua nếu đã có theme) */
-[data-testid="stAppViewContainer"] > .main {
-    background-color: white;
-}
-
-/* Ẩn tiêu đề mặc định của Streamlit (nếu cần) */
-header { visibility: hidden; }
-
-/* Các CSS giữ nguyên */
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
 }
 .info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
@@ -491,21 +433,12 @@ with st.sidebar:
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
 
-# THAY THẾ st.title BẰNG HTML CUSTOM HEADER
-st.markdown("""
-    <div class="custom-header">
-        <img class="logo" src="data:image/png;base64, [HÌNH ẢNH LOGO NHNN ĐÃ CHUYỂN SANG BASE64 Ở ĐÂY]" alt="Logo Ngân Hàng Nhà Nước">
-        <div class="title-group">
-            <p class="dashboard-text">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>
-            <h1 class="main-title">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>
-            <p class="dbnd-text">DBND</p>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+st.title("Ngân Hàng Nhà Nước Khu Vực Hà Nội I")
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
     st.stop()
+
 # ... (Tiếp tục xử lý dữ liệu)
 
 data = load_excel(uploaded)
