@@ -235,8 +235,12 @@ with tab_chat:
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # 2. Tạo nội dung cho API
-        history_for_api = [{"role": m["role"], "parts": [{"text": m["content"]}]} for m in st.session_state.chat_messages]
+        # 2. Tạo nội dung cho API (Đã sửa lỗi mapping role)
+        history_for_api = []
+        for m in st.session_state.chat_messages:
+            # Map role 'assistant' (cho Streamlit) sang 'model' (cho Gemini API)
+            api_role = "model" if m["role"] == "assistant" else m["role"]
+            history_for_api.append({"role": api_role, "parts": [{"text": m["content"]}]})
         
         # 3. Gọi API và hiển thị phản hồi
         with st.chat_message("assistant"):
@@ -253,7 +257,8 @@ with tab_chat:
                         ai_response = response.text
                         break
                     except APIError as e:
-                        ai_response = f"Lỗi gọi API: {e}. Vui lòng kiểm tra API key."
+                        # Thay đổi cách hiển thị lỗi để rõ ràng hơn
+                        ai_response = f"Lỗi gọi API ({e.args[0]}): Vui lòng kiểm tra API key hoặc giới hạn sử dụng."
                         if i < 2:
                             time.sleep(2 ** i)
                             continue
