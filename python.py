@@ -248,34 +248,48 @@ def rag_chat_tab():
                 st.session_state.rag_chat_counter += 1
 
 # ==============================
-# GEMINI CHATBOX (MỚI THÊM)
-# ==============================
-
 def _get_gemini_model_name():
-    # Cho phép override qua secrets; mặc định dùng Gemini 2.5 Pro
-    return st.secrets.get("GEMINI_MODEL", "models/gemini-2.5-pro")
+    # Mặc định dùng Gemini 2.5 Flash, dễ dùng hơn và ít gây lỗi Bad Request hơn bản Pro
+    # Lưu ý: Trả về tên mô hình BỎ TIỀN TỐ "models/"
+    return st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 def call_gemini(messages: list):
     """
-    Gọi Google Generative Language API cho chat.
+    Gọi Google Generative Language API cho chat (sử dụng API REST).
     - messages: danh sách dict {"role": "user"/"model", "content": str}
     """
     if "GEMINI_API_KEY" not in st.secrets:
         return "Lỗi cấu hình: Thiếu GEMINI_API_KEY trong secrets.toml."
 
     api_key = st.secrets["GEMINI_API_KEY"]
-    model = _get_gemini_model_name()
+    
+    # Lấy tên model (ví dụ: gemini-2.5-flash)
+    model_name = _get_gemini_model_name() 
 
     # Chuyển đổi sang schema contents của Gemini
     contents = []
     for m in messages:
+        # API REST của Gemini sử dụng 'user' và 'model'
         role = "user" if m["role"] == "user" else "model"
-        contents.append({
-            "role": role,
-            "parts": [{"text": m["content"][:20000]}]  # cắt an toàn nếu prompt quá dài
-        })
+        
+        # Đảm bảo role 'model' không đứng ngay sau một role 'model' khác
+        if contents and contents[-1]['role'] == role and role == 'model':
+             # Đây là lý do gây lỗi 400: Không cho phép hai role 'model' liên tiếp
+             # Ta sẽ nối nội dung thay vì thêm một entry mới
+             contents[-1]['parts'][0]['text'] += "\n\n" + m["content"][:20000]
+        else:
+            contents.append({
+                "role": role,
+                "parts": [{"text": m["content"][:20000]}]  # cắt an toàn nếu prompt quá dài
+            })
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/{model}:generateContent?key={api_key}"
+    # Sửa URL để sử dụng tên model chính xác (tiền tố models/ được thêm ở đây)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    
+    # Thêm system_instruction (nếu cần) vào payload, nhưng chỉ khi đó là tin nhắn đầu tiên
+    # Lưu ý: Cấu trúc System Instruction cho API REST có thể phức tạp. 
+    # Tạm thời để đơn giản, ta sẽ chỉ truyền messages.
+
     payload = {
         "contents": contents,
         "generationConfig": {
@@ -294,23 +308,34 @@ def call_gemini(messages: list):
 
     try:
         resp = requests.post(url, json=payload, timeout=90)
-        resp.raise_for_status()
+        resp.raise_for_status() # Nếu gặp lỗi 4xx/5xx, sẽ raise exception ngay lập tức
+        
         data = resp.json()
+        
         # Đọc text từ candidates
         cands = data.get("candidates", [])
         if not cands:
+             # Kiểm tra lỗi chặn (safety block)
+            prompt_feedbacks = data.get("promptFeedback", {})
+            if prompt_feedbacks.get("safetyRatings"):
+                return "Gemini bị chặn trả lời do vi phạm chính sách an toàn."
             return "Gemini không trả về nội dung. Vui lòng thử lại."
+            
         parts = cands[0].get("content", {}).get("parts", [])
         if not parts:
             return "Gemini không có phần trả lời hợp lệ."
+            
         text = "".join(p.get("text", "") for p in parts).strip()
         return text if text else "Gemini trả lời rỗng."
+        
     except requests.exceptions.Timeout:
         return "Gemini: Hết thời gian chờ (Timeout 90s). Vui lòng thử lại."
     except requests.exceptions.RequestException as e:
         return f"Lỗi kết nối tới Gemini: {e}"
     except Exception as e:
         return f"Lỗi xử lý phản hồi từ Gemini: {e}"
+
+# Các hàm reset_gemini_session() và gemini_chat_tab() giữ nguyên.
 
 def reset_gemini_session():
     st.session_state.gemini_history = []
@@ -346,7 +371,7 @@ def gemini_chat_tab():
 # .streamlit/secrets.toml
 GEMINI_API_KEY = "your_api_key_here"
 # Tùy chọn: đổi model
-# GEMINI_MODEL = "models/gemini-2.5-flash"  # hoặc models/gemini-2.5-pro
+# GEMINI_MODEL = "gemini-2.5-pro"  # Hoặc "gemini-2.5-flash"
             """.strip(),
             language="toml"
         )
