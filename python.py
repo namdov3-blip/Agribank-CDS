@@ -179,7 +179,7 @@ hr {
 
 /* Info Card */
 .info-card { 
-    padding: 30px 20px; 
+    padding: 20px 15px; 
     border: 5px solid #e8e8e8; 
     border-left: 5px solid var(--primary-color); /* Điểm nhấn màu chủ đạo */
     border-radius: 20px; 
@@ -188,13 +188,13 @@ hr {
     margin-bottom: 10px;
 }
 .info-card .label { 
-    font-size: 20px; 
+    font-size: 16px; 
     color: var(--primary-color); 
     font-weight: 700; 
     margin-bottom: 4px; 
 }
 .info-card .value { 
-    font-size: 20px; 
+    font-size: 16px; 
     line-height: 1.4; 
     white-space: pre-wrap; 
     word-break: break-word; 
