@@ -376,10 +376,9 @@ COL_MAP = {
         "structure_purpose_consumption_vnd": ["structure_purpose_consumption_vnd"],
         "structure_purpose_trade_vnd": ["structure_purpose_trade_vnd"],
         "structure_purpose_other_vnd": ["structure_purpose_other_vnd"],
-
-        "strucuture_econ_state_vnd": ["strucuture_econ_state_vnd"],
-        "strucuture_econ_nonstate_enterprises_vnd": ["structure_econ_nonstate_enterprises_vnd"],
-        "strucuture_econ_individuals_households_vnd": ["structure_econ_individuals_households_vnd"],
+        "structure_econ_state_vnd": ["strucuture_econ_state_vnd"], 
+        "structure_econ_nonstate_enterprises_vnd": ["structure_econ_nonstate_enterprises_vnd"], 
+        "structure_econ_individuals_households_vnd": ["structure_econ_individuals_households_vnd"], 
     },
     "findings": {
         "category": ["category"],
@@ -594,13 +593,15 @@ with tab_over:
     fig_p = make_bar(dfp, title="Mục đích vay (bar nhỏ)")
     st.plotly_chart(fig_p, use_container_width=True)
 
-    # 5) Thành phần kinh tế (luôn hiển thị cả 0)
+   # 5) Thành phần kinh tế (luôn hiển thị cả 0)
     st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
-        ("DN Nhà nước", "strucuture_econ_state_vnd"),
-        ("DN tổ chức kinh tế", "structure_econ_nonstate_enterprises_vnd"),
-        ("DN tư nhân cá thể", "structure_econ_individuals_households_vnd"),
+        ("DN Nhà nước", "structure_econ_state_vnd"), 
+        ("DN tổ chức kinh tế", "structure_econ_nonstate_enterprises_vnd"), 
+        ("DN tư nhân cá thể", "structure_econ_individuals_households_vnd"), 
     ]
+    
+    # ... (Các bước lấy dữ liệu)
     eco_data = []
     for n, c in eco_items:
         val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
