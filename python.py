@@ -222,13 +222,14 @@ hr {
 /* Căn giữa các tabs bằng cách điều chỉnh flexbox của container */
 [data-testid="stTabs"] > div {
     justify-content: center !important; 
-    gap: 60px; /* Thêm khoảng cách giữa các tab */
+    gap: 600px; /* Thêm khoảng cách giữa các tab */
 }
 /* Phóng to font chữ của từng tab */
 button[data-testid^="stTab"] {
-    font-size: 5rem !important; /* Cỡ chữ lớn hơn */
-    font-weight: 14000; /* Làm chữ đậm hơn */
-    padding: 20px 40px; /* Tăng padding để tab to hơn */
+    font-size: 20px !important; /* TĂNG CỠ CHỮ LÊN MỨC LỚN HƠN */
+    font-weight: 700 !important; /* Tăng độ đậm */
+    padding: 10px 25px !important; /* Tăng padding để tab to hơn */
+    white-space: nowrap; /* Ngăn ngắt dòng */
 }
 /* Tabs Accent */
 button[data-testid^="stTab"]:focus {
