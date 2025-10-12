@@ -495,14 +495,6 @@ COL_MAP = {
 # ==============================
 
 with st.sidebar:
-    # --- LOGO VÀ TIÊU ĐỀ TRONG SIDEBAR ---
-    # Gợi ý: Lưu logo NHNN dạng crop (vuông) vào file logo_nhnn_sidebar.png
-    # Thay thế "logo_nhnn_sidebar.png" bằng đường dẫn file logo của bạn.
-    try:
-        st.image("logo_nhnn.png", width=70) 
-    except:
-        # Nếu không tìm thấy file logo, chỉ hiển thị tiêu đề
-        st.markdown(f'<h1 style="color:#1f6feb; font-size: 1.5rem; border-bottom: none;">NHNN Việt Nam</h1>', unsafe_allow_html=True)
 
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
@@ -512,7 +504,7 @@ with st.sidebar:
 # HEADER CHÍNH (ĐÃ THIẾT KẾ LẠI)
 # ==============================
 
-col_logo, col_title, col_spacer = st.columns([5, 5, 2])
+col_logo, col_title, col_spacer = st.columns([2, 5, 2])
 
 with col_logo:
     # Gợi ý: Lưu logo NHNN dạng ban đầu vào file logo_nhnn.png
