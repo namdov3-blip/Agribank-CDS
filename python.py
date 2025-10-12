@@ -266,11 +266,11 @@ def rag_chat_tab():
 # ==============================
 def gemini_chat_tab(client: genai.Client):
     """Thêm khung chat Gemini kết nối qua API."""
-    st.header("🧠 External Gemini 💬")
+    st.header("🤖 External Gemini")
     st.write("Sử dụng Gemini để hỏi đáp về mọi chủ đề (tài chính, lập trình, kiến thức chung,...)")
     
     # --- LOGIC RESET ---
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử)", type="primary"):
+    if st.button("🔄 Bắt đầu phiên Chat mới", type="primary"):
         reset_gemini_chat_session()
         return
     
