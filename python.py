@@ -222,7 +222,7 @@ hr {
 /* Căn giữa các tabs bằng cách điều chỉnh flexbox của container */
 [data-testid="stTabs"] > div {
     justify-content: center !important; 
-    gap: 60px; /* Thêm khoảng cách giữa các tab */
+    gap: 200px; /* Thêm khoảng cách giữa các tab */
 }
 /* Phóng to font chữ của từng tab */
 button[data-testid^="stTab"] {
