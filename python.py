@@ -248,7 +248,7 @@ def rag_chat_tab():
                 st.session_state.rag_chat_counter += 1
 
 # ==============================
-# GEMINI CHATBOT LOGIC (ĐÃ SỬA LỖI 400 BAD REQUEST)
+# GEMINI CHATBOT LOGIC (MỚI/ĐÃ CHỈNH SỬA)
 # ==============================
 
 def _get_gemini_model_name():
@@ -281,9 +281,9 @@ def call_gemini(messages: list):
         
         # KHẮC PHỤC LỖI #2: Đảm bảo không có vai trò liên tiếp (user->user hoặc model->model)
         if contents and contents[-1]['role'] == role:
-             # Nếu trùng role (dù là user hay model), ta sẽ nối nội dung để tạo thành một lượt
-             # duy nhất. Điều này đảm bảo vai trò luôn xen kẽ.
-             contents[-1]['parts'][0]['text'] += "\n\n" + content_text
+              # Nếu trùng role (dù là user hay model), ta sẽ nối nội dung để tạo thành một lượt
+              # duy nhất. Điều này đảm bảo vai trò luôn xen kẽ.
+              contents[-1]['parts'][0]['text'] += "\n\n" + content_text
         else:
             # Thêm tin nhắn mới nếu role khác
             contents.append({
@@ -411,6 +411,7 @@ GEMINI_API_KEY = "your_api_key_here"
                 st.markdown(reply)
                 st.session_state.gemini_history.append({"role": "model", "content": reply})
                 st.session_state.gemini_turns += 1
+
 
 # ==============================
 # Column mappings (GIỮ NGUYÊN)
@@ -540,7 +541,7 @@ with st.sidebar:
     st.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
 
 # ==============================
-# Tabs (ĐÃ HOÀN THIỆN)
+# Tabs (ĐÃ THÊM TAB GEMINI)
 # ==============================
 
 tab_docs, tab_over, tab_find, tab_act, tab_chat, tab_gemini = st.tabs(
@@ -743,14 +744,13 @@ with tab_find:
             if "impacted_accounts" in sub_df.columns:
                 sub_df["impacted_accounts"] = sub_df["impacted_accounts"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "—")
             # Hiển thị dataframe
-            st.dataframe(sub_df, use_container_width=True)
-
+            st.dataframe(sub_df, use_container_width=True, hide_index=True)
 
 # ---- Actions (GIỮ NGUYÊN) ----
 with tab_act:
-    st.header("Kết quả Thực thi Khuyến Nghị (Actions)")
+    st.header("Biện Pháp Xử Lý (Actions)")
     st.markdown("---")
     if df_act.empty:
         st.info("Không có dữ liệu actions.")
     else:
-        st.dataframe(df_act, use_container_width=True)
+        st.dataframe(df_act, use_container_width=True, hide_index=True)
