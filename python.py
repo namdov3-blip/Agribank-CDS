@@ -226,14 +226,14 @@ hr {
 }
 /* Phóng to font chữ của từng tab */
 button[data-testid^="stTab"] {
-    font-size: 5rem !important; /* Cỡ chữ lớn hơn */
-    font-weight: 14000; /* Làm chữ đậm hơn */
-    padding: 20px 40px; /* Tăng padding để tab to hơn */
+    font-size: 20px !important; /* Cỡ chữ lớn hơn */
+    font-weight: 1400; /* Làm chữ đậm hơn */
+    padding: 40px 40px; /* Tăng padding để tab to hơn */
 }
 /* Tabs Accent */
 button[data-testid^="stTab"]:focus {
     color: var(--primary-color) !important; 
-    border-bottom: 2px solid var(--primary-color) !important; 
+    border-bottom: 4px solid var(--primary-color) !important; 
 }
 </style>
 """, unsafe_allow_html=True)
