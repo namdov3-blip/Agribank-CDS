@@ -139,21 +139,121 @@ def make_pie(labels_vals, title="", height=260):
     return fig
 
 # ==============================
-# Theme + CSS (GIỮ NGUYÊN)
+# Theme + CSS (THAY THẾ TOÀN BỘ ĐOẠN NÀY)
 # ==============================
 
-st.markdown("""
+st.markdown(f"""
 <style>
-:root { --label-color: #1f6feb; }
+:root {
+    --label-color: #1f6feb; 
+    --nhnn-gold: #B8860B; /* Vàng Gold */
+    --nhnn-light-bg: #FFF8E1; /* Nền Vàng Gold Nhẹ */
+    --nhnn-logo-url: url("[RAW_LINK_LOGO_NHNN]"); /* THAY THẾ BẰNG LINK RAW LOGO CỦA BẠN */
+}
+
+/* KHẮC PHỤC LỖI MẤT NÚT SIDEBAR: ẨN VÀ THAY THẾ NỘI DUNG MẶC ĐỊNH */
+[data-testid="stHeader"] {{
+    /* Ẩn Header mặc định của Streamlit (chỉ phần chứa logo và nút sidebar) */
+    visibility: hidden;
+    height: 0px; /* Đảm bảo không chiếm không gian */
+    margin: 0;
+    padding: 0;
+    position: relative; /* Giữ vị trí tương đối */
+}}
+
+/* ĐỊNH DẠNG CUSTOM HEADER */
+.custom-header-container {{
+    /* Đặt custom header ở trên cùng, không bị các yếu tố Streamlit khác ảnh hưởng */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999; /* Đảm bảo luôn nằm trên các nội dung khác */
+    
+    background-color: var(--nhnn-light-bg);
+    border-bottom: 2px solid var(--nhnn-gold);
+    padding: 10px 0; /* Giảm padding */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}}
+
+.custom-header {{
+    color: var(--nhnn-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    max-width: 1200px; /* Giới hạn chiều rộng nếu cần */
+    margin: auto;
+}}
+
+.custom-header .logo {{
+    width: 70px; /* Kích thước logo */
+    height: auto;
+    position: absolute;
+    left: 20px; /* Đặt logo lệch trái một chút */
+    top: 50%;
+    transform: translateY(-50%);
+    content: var(--nhnn-logo-url); /* Chèn logo bằng CSS */
+    background-image: var(--nhnn-logo-url);
+    background-size: contain;
+    background-repeat: no-repeat;
+}}
+
+/* ĐẢM BẢO LOGO HIỂN THỊ TỐT */
+.custom-header .logo img {{
+    width: 70px; 
+    height: 70px; 
+    opacity: 0; /* Ẩn thẻ img để chỉ dùng ảnh nền, nếu bạn dùng thẻ img trong HTML */
+}}
+
+.custom-header .title-group {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-left: 100px; /* Khoảng cách với logo */
+    padding-right: 100px;
+}}
+
+.custom-header .dashboard-text {{
+    font-size: 13px;
+    font-weight: 500;
+    margin: 0;
+    padding: 0;
+    letter-spacing: 1.5px;
+}}
+
+.custom-header .main-title {{
+    font-size: 28px; /* Chữ to rõ */
+    font-weight: 800;
+    margin: 3px 0;
+    line-height: 1.2;
+}}
+
+.custom-header .dbnd-text {{
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}}
+
+/* Điều chỉnh vị trí nội dung chính để không bị Header che */
+[data-testid="stAppViewContainer"] > .main {{
+    padding-top: 100px; /* Tạo khoảng trống tương đương chiều cao header + padding */
+}}
+
+
+/* Các CSS giữ nguyên */
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
 }
 .info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
 .info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
 .info-card .value { font-size: 15px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
 .doc-wrap { padding: 10px 14px; border: 1px solid #e6e6e6; border-radius: 12px; background: #fafcff; margin-bottom: 14px; }
 .doc-title { font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -432,8 +532,24 @@ with st.sidebar:
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
+    
+# Xóa st.title("Ngân Hàng Nhà Nước Khu Vực Hà Nội I") và thay bằng HTML Custom Header
+st.markdown("""
+    <div class="custom-header-container">
+        <div class="custom-header">
+            <div class="logo">
+                <img src="" alt="Logo Ngân Hàng Nhà Nước"/>
+            </div>
+            
+            <div class="title-group">
+                <p class="dashboard-text">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>
+                <h1 class="main-title">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>
+                <p class="dbnd-text">DBND</p>
+            </div>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
-st.title("Ngân Hàng Nhà Nước Khu Vực Hà Nội I")
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
