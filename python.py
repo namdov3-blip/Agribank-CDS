@@ -519,46 +519,74 @@ with st.sidebar:
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
 
 # ==============================
-# HEADER CHÍNH (ĐÃ THIẾT KẾ LẠI THEO YÊU CẦU MÀU GOLD/NÂU VÀNG)
+# HEADER CHÍNH (ĐÃ SỬA ĐỔI LẠI ĐỂ LOGO TO HƠN VÀ CĂN CHỈNH THẲNG HÀNG VỚI CHỮ)
 # ==============================
 
-col_logo, col_title, col_spacer = st.columns([1.5, 7, 1.5]) # Thêm cột spacer để căn giữa tốt hơn
+# Điều chỉnh tỷ lệ cột: 1 (cho logo) và 8 (cho các tiêu đề văn bản)
+# và thêm một cột nhỏ bên trái để giúp căn chỉnh các thành phần tiêu đề vào giữa tổng thể
+col_left_spacer, col_logo, col_title_group, col_right_spacer = st.columns([1, 1.5, 7, 0.5]) 
 
 with col_logo:
-    # 1. LOGO (Bên Trái)
+    # 1. LOGO (Bên Trái - Kích thước lớn hơn)
+    # Tăng chiều rộng của logo
     try:
-        st.image("logo_nhnn.png", width=120) 
+        st.image("logo_nhnn.png", width=150) # Tăng width lên 150 (trước đó là 120)
     except:
-        # Giữ khoảng trống nếu không có logo
-        st.markdown(f'<div style="height: 120px;"></div>', unsafe_allow_html=True) 
+        # Giữ khoảng trống nếu không có logo để giữ bố cục
+        st.markdown(f'<div style="height: 150px;"></div>', unsafe_allow_html=True) # Điều chỉnh chiều cao tương ứng
 
-with col_title:
-    # 2. TIÊU ĐỀ (Giữa)
-    # Căn giữa và sử dụng màu Nâu Vàng/Đỏ Đô
+with col_title_group:
+    # 2. TIÊU ĐỀ (Nhóm Tiêu đề nằm ở giữa)
     primary_color = "var(--primary-color)" # #70573e Nâu Vàng
     
-    # Dòng 1: DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO (nhỏ)
+    # Sử dụng HTML/CSS để căn chỉnh nhóm văn bản theo chiều dọc
+    # và đẩy chúng sang trái một chút để "trông có vẻ" nằm giữa
+    # khi có logo bên cạnh.
     st.markdown(
-        f'<p style="text-align: center; color: {primary_color}; font-size: 1.1rem; font-weight: 500; margin-top: 20px; margin-bottom: 0px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', 
-        unsafe_allow_html=True
-    )
-    
-    # Dòng 2: NGÂN HÀNG NHÀ NƯỚC VIỆT NAM (to)
-    st.markdown(
-        f'<h1 style="text-align: center; color: {primary_color}; font-size: 2.8rem; margin-top: 0px; margin-bottom: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', 
-        unsafe_allow_html=True
-    )
-    
-    # Dòng 3: DBND (nhỏ)
-    st.markdown(
-        f'<p style="text-align: center; color: #333333; font-size: 1rem; margin-top: 0px;">DBND</p>', 
+        f"""
+        <div style="
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            height: 100%; 
+            margin-top: -15px; /* Điều chỉnh để nâng tổng thể văn bản lên một chút */
+            text-align: left; /* Căn lề trái cho các dòng chữ trong nhóm này */
+            transform: translateX(-5%); /* Dịch chuyển nhẹ sang trái để cân đối với logo */
+        ">
+            <p style="
+                color: {primary_color}; 
+                font-size: 1.1rem; 
+                font-weight: 500; 
+                margin-bottom: 0px;
+                line-height: 1.2;
+            ">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>
+            
+            <h1 style="
+                color: {primary_color}; 
+                font-size: 2.8rem; 
+                margin-top: 0px; 
+                margin-bottom: 0px;
+                line-height: 1.2;
+            ">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>
+            
+            <p style="
+                color: #333333; 
+                font-size: 1rem; 
+                margin-top: 5px; /* Giảm margin-top để gần hơn với dòng trên */
+                line-height: 1.2;
+            ">DBND</p>
+        </div>
+        """, 
         unsafe_allow_html=True
     )
 
-with col_spacer:
-    st.markdown("") # Cột này giữ trống
+# Các cột trống để cân đối
+with col_left_spacer:
+    st.markdown("")
+with col_right_spacer:
+    st.markdown("")
 
-# Đường phân cách sau Header (có thể thay bằng viền đỏ như ảnh mẫu)
+# Đường phân cách sau Header (giữ nguyên)
 st.markdown(f'<div style="height: 3px; background-color: var(--secondary-color); width: 100%;"></div>', unsafe_allow_html=True)
 
 
