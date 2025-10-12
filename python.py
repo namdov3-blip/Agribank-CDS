@@ -170,7 +170,7 @@ def info_card(label, value):
     )
 
 # ==============================
-# RAG CHATBOT LOGIC (GIỮ NGUYÊN)
+# RAG CHATBOT LOGIC (ĐÃ SỬA LỖI: Thêm key cho button)
 # ==============================
 
 def call_n8n_chatbot(prompt: str):
@@ -221,9 +221,10 @@ def rag_chat_tab():
     """Thêm khung chat RAG kết nối qua n8n Webhook vào tab."""
     st.header("🤖 Internal RAG")
     st.write("Sử dụng RAG Bot để hỏi đáp về dữ liệu KLTT")
-    if st.button("🔄 Bắt đầu phiên Chat mới", type="primary"):
+    # SỬA LỖI: Thêm key="rag_reset_button" để tránh trùng lặp ID
+    if st.button("🔄 Bắt đầu phiên Chat mới", type="primary", key="rag_reset_button"):
         reset_rag_chat_session()
-        return 
+        return
 
     if "rag_chat_history" not in st.session_state:
         st.session_state.rag_chat_history = []
@@ -262,15 +263,24 @@ def rag_chat_tab():
                 st.session_state.rag_chat_counter += 1
 
 # ==============================
-# GEMINI CHATBOT LOGIC (ĐÃ SỬA LỖI: Chuyển logic vào hàm)
+# GEMINI CHATBOT LOGIC (ĐÃ SỬA LỖI: Thêm key cho button)
 # ==============================
+def reset_gemini_chat_session():
+    """Hàm này sẽ reset toàn bộ lịch sử chat và session ID."""
+    st.session_state["chat_messages"] = [
+        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Xin chào! Tôi là Gemini. Bạn có câu hỏi nào muốn tôi giải đáp không?"}
+    ]
+    st.session_state["gemini_chat_counter"] = 0
+    st.rerun()
+
 def gemini_chat_tab(client: genai.Client):
     """Thêm khung chat Gemini kết nối qua API."""
     st.header("🤖 External Gemini")
     st.write("Sử dụng Gemini để hỏi đáp về mọi chủ đề (tài chính, lập trình, kiến thức chung,...)")
     
     # --- LOGIC RESET ---
-    if st.button("🔄 Bắt đầu phiên Chat mới", type="primary"):
+    # SỬA LỖI: Thêm key="gemini_reset_button" để tránh trùng lặp ID
+    if st.button("🔄 Bắt đầu phiên Chat mới", type="primary", key="gemini_reset_button"):
         reset_gemini_chat_session()
         return
     
@@ -609,7 +619,7 @@ with tab_over:
     fig_p = make_bar(dfp, title="Mục đích vay (bar nhỏ)")
     st.plotly_chart(fig_p, use_container_width=True)
 
-   # 5) Thành phần kinh tế (luôn hiển thị cả 0)
+    # 5) Thành phần kinh tế (luôn hiển thị cả 0)
     st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
         ("DN Nhà nước", "structure_econ_state_vnd"), 
