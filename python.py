@@ -513,13 +513,13 @@ with col_logo:
     # Gợi ý: Lưu logo NHNN dạng ban đầu vào file logo_nhnn.png
     # Thay thế "logo_nhnn.png" bằng đường dẫn file logo của bạn.
     try:
-        st.image("logo_nhnn.png", width=360) 
+        st.image("logo_nhnn.png", width=200) 
     except:
         st.markdown(f'<div style="height: 120px;"></div>', unsafe_allow_html=True)
 
 with col_title:
      # Sử dụng CSS để căn giữa và áp dụng màu Nâu Vàng
-    header_style = "text-align: center; color: var(#70573e); margin-bottom: 0px;"
+    header_style = "text-align: center; color: var(--primary-color); margin-bottom: 0px;"
     
     st.markdown(f'<p style="{header_style} font-size: 1.1rem; font-weight: 500; margin-top: 15px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', unsafe_allow_html=True)
     
