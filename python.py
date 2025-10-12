@@ -219,20 +219,9 @@ hr {
     margin-bottom: 10px; 
 }
 
-/* Căn giữa các tabs bằng cách điều chỉnh flexbox của container */
-[data-testid="stTabs"] > div {
-    justify-content: center !important; 
-    gap: 600px; /* Thêm khoảng cách giữa các tab */
-}
-/* Phóng to font chữ của từng tab */
-button[data-testid^="stTab"] {
-    font-size: 20px !important; /* TĂNG CỠ CHỮ LÊN MỨC LỚN HƠN */
-    font-weight: 700 !important; /* Tăng độ đậm */
-    padding: 10px 25px !important; /* Tăng padding để tab to hơn */
-    white-space: nowrap; /* Ngăn ngắt dòng */
-}
 /* Tabs Accent */
 button[data-testid^="stTab"]:focus {
+    font-size: 30px
     color: var(--primary-color) !important; 
     border-bottom: 2px solid var(--primary-color) !important; 
 }
