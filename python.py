@@ -146,7 +146,6 @@ st.markdown("""
 <style>
 :root { 
     --primary-color: #70573e; /* Màu Nâu Vàng từ logo (Chủ đạo) */
-    --secondary-color: #a50000; /* Màu Đỏ Đô (Nhấn mạnh: Biểu đồ, Alert) */
     --background-light: #fafaf4; /* Nền kem nhẹ */
 }
 /* Áp dụng nền kem cho toàn bộ trang */
@@ -205,7 +204,7 @@ hr {
 /* Document Wrap */
 .doc-wrap { 
     padding: 15px; 
-    border: 1px solid var(--secondary-color); /* Viền đỏ đô */
+    border: 1px solid var(--primary-color); 
     border-radius: 12px; 
     background: #fff0f0; /* Nền rất nhạt */
     margin-bottom: 14px; 
@@ -213,7 +212,7 @@ hr {
 .doc-title { 
     font-weight: 700; 
     font-size: 18px; 
-    color: var(--secondary-color); /* Tiêu đề đỏ đô */
+    color: var(--primary-color);
     margin-bottom: 10px; 
 }
 
@@ -497,7 +496,7 @@ COL_MAP = {
 with st.sidebar:
 
     st.header("📤 Tải dữ liệu")
-    uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
+    uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, actions", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
 
 # ==============================
