@@ -14,62 +14,11 @@ from google import genai
 from google.genai.errors import APIError
 import time
 
-# ==============================
-# HEADER CUSTOM DESIGN (SBV STYLE)
-# ==============================
-st.markdown("""
-<style>
-/* Toàn bộ phần header nền vàng gold nhẹ */
-.header-sbv {
-    background-color: #fdf8ee;
-    padding: 20px 0;
-    text-align: center;
-    border-bottom: 2px solid #d4af37;
-    position: relative;
-}
-
-/* Logo bên trái */
-.header-sbv img {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-260px);
-    top: 20px;
-    width: 90px;
-}
-
-/* Dòng 1: dashboard nhỏ */
-.header-sbv .sub-title {
-    font-size: 14px;
-    color: #b58a00;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-    font-weight: 500;
-}
-
-/* Dòng 2: tên ngân hàng lớn */
-.header-sbv .main-title {
-    font-size: 24px;
-    font-weight: 800;
-    color: #7a5b00;
-    margin: 2px 0;
-}
-
-/* Dòng 3: chữ DBND nhỏ */
-.header-sbv .bottom-title {
-    font-size: 16px;
-    color: #b58a00;
-    margin-top: 2px;
-    font-weight: 600;
-}
-</style>
-
-<div class="header-sbv">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/State_Bank_of_Vietnam_logo.svg" alt="SBV Logo">
-    <div class="sub-title">Dashboard tổng hợp phân tích báo cáo</div>
-    <div class="main-title">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</div>
-    <div class="bottom-title">DBND</div>
-</div>
-""", unsafe_allow_html=True)
+st.set_page_config(
+    page_title="Ngân Hàng Nhà Nước Khu Vực Hà Nội I",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # --- Gemini Client Initialization (ĐÃ SỬA LỖI: Thêm khởi tạo client) ---
 gemini_client = None
