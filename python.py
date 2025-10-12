@@ -538,7 +538,7 @@ st.markdown("""
     <div class="custom-header-container">
         <div class="custom-header">
             <div class="logo">
-                <img src="" alt="Logo Ngân Hàng Nhà Nước"/>
+                <img src="logo_nhnn.png" alt="Logo Ngân Hàng Nhà Nước"/>
             </div>
             
             <div class="title-group">
