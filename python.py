@@ -140,7 +140,7 @@ def make_pie(labels_vals, title="", height=260):
     return fig
 
 # ==============================
-# Theme + CSS (ĐÃ SỬA ĐỔI CHO UX/UI NHNN TÔNG VÀNG/ĐỎ ĐÔ)
+# Theme + CSS (ĐÃ SỬA ĐỔI CHO UX/UI NHNN TÔNG VÀNG/ĐỎ ĐÔ + CĂN CHỈNH)
 # ==============================
 
 st.markdown("""
@@ -149,12 +149,52 @@ st.markdown("""
     --primary-color: #70573e; /* Màu Nâu Vàng từ logo (Chủ đạo) */
     --secondary-color: #a50000; /* Màu Đỏ Đô (Nhấn mạnh: Biểu đồ, Alert) */
     --background-light: #fafaf4; /* Nền kem nhẹ */
+    --header-text-color: #70573e; /* Màu chữ Header: Nâu Vàng */
 }
 /* Áp dụng nền kem cho toàn bộ trang */
 [data-testid="stAppViewContainer"] {
     background-color: var(--background-light);
 }
-/* Tiêu đề tổng quát */
+
+/* -------------------- START: Sửa Căn chỉnh Header & Sidebar -------------------- */
+/* Căn giữa Tiêu đề trong Sidebar */
+[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+    text-align: center;
+}
+/* Căn giữa logo trong Sidebar */
+[data-testid="stSidebar"] .stImage {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 15px; /* Thêm khoảng cách với chữ */
+}
+
+/* Lớp CSS cho Header: Căn chỉnh thẳng hàng giữa Logo và Text */
+.header-row {
+    display: flex;
+    align-items: center; /* Căn chỉnh theo chiều dọc */
+    justify-content: center; /* Căn giữa toàn bộ cụm */
+    gap: 20px; /* Khoảng cách giữa Logo và Text */
+    padding: 10px 0;
+}
+/* Style riêng cho nhóm text trong Header */
+.header-text-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Căn lề trái cho các dòng chữ */
+    color: var(--header-text-color);
+}
+.header-text-group p, .header-text-group h1 {
+    margin: 0;
+    padding: 0;
+    line-height: 1.1;
+    text-transform: uppercase;
+    color: var(--header-text-color);
+}
+/* -------------------- END: Sửa Căn chỉnh Header & Sidebar -------------------- */
+
+
+/* Tiêu đề tổng quát (bên trong tab) */
 h1, h2, h3, h4 {
     color: var(--primary-color);
 }
@@ -162,28 +202,24 @@ h1 {
     font-size: 2.2rem;
     font-weight: 700;
 }
+/* (Giữ nguyên các style còn lại...) */
 h2 {
     font-size: 1.8rem;
-    border-bottom: 2px solid #e6e6e6; /* Đường phân cách nhẹ */
+    border-bottom: 2px solid #e6e6e6;
     padding-bottom: 5px;
     margin-top: 1.5rem;
 }
-/* Thanh phân cách */
 hr {
-    border-top: 1px solid var(--primary-color); /* Màu nâu vàng chủ đạo */
+    border-top: 1px solid var(--primary-color);
 }
-
-/* Dataframe */
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
     white-space: pre-wrap !important;
     word-break: break-word !important;
 }
-
-/* Info Card */
 .info-card { 
     padding: 10px 12px; 
     border: 1px solid #e8e8e8; 
-    border-left: 5px solid var(--primary-color); /* Điểm nhấn màu chủ đạo */
+    border-left: 5px solid var(--primary-color);
     border-radius: 10px; 
     background: #fff; 
     min-height: 72px; 
@@ -202,31 +238,25 @@ hr {
     word-break: break-word; 
     font-weight: 600;
 }
-
-/* Document Wrap */
 .doc-wrap { 
     padding: 15px; 
-    border: 1px solid var(--secondary-color); /* Viền đỏ đô */
+    border: 1px solid var(--secondary-color);
     border-radius: 12px; 
-    background: #fff0f0; /* Nền rất nhạt */
+    background: #fff0f0;
     margin-bottom: 14px; 
 }
 .doc-title { 
     font-weight: 700; 
     font-size: 18px; 
-    color: var(--secondary-color); /* Tiêu đề đỏ đô */
+    color: var(--secondary-color);
     margin-bottom: 10px; 
 }
-
-/* Tabs Accent */
 button[data-testid^="stTab"]:focus {
     color: var(--primary-color) !important; 
     border-bottom: 2px solid var(--primary-color) !important; 
 }
-
-/* Ẩn logo cũ của Streamlit ở sidebar (tùy chọn) */
 [data-testid="stSidebar"] img {
-    opacity: 0;
+    opacity: 1; /* Hiển thị logo trong sidebar */
 }
 </style>
 """, unsafe_allow_html=True)
@@ -505,49 +535,58 @@ COL_MAP = {
 # Sidebar (Upload + Filters) (ĐÃ SỬA ĐỔI CHO UX/UI NHNN)
 # ==============================
 
+# ==============================
+# Sidebar (Upload + Filters) (ĐÃ SỬA ĐỔI ĐỂ CĂN GIỮA TIÊU ĐỀ)
+# ==============================
+
 with st.sidebar:
     # --- LOGO VÀ TIÊU ĐỀ TRONG SIDEBAR ---
     try:
         # Tải logo nhỏ/vuông cho Sidebar
         st.image("logo_nhnn_sidebar.png", width=60) 
     except:
-        # Nếu không tìm thấy file logo, chỉ hiển thị tiêu đề (Màu Nâu Vàng)
-        st.markdown(f'<h1 style="color:var(--primary-color); font-size: 1.5rem; border-bottom: none;">NHNN Việt Nam</h1>', unsafe_allow_html=True)
+        # Giữ khoảng trống nếu không có file logo
+        st.markdown(f'<div style="height: 60px; margin-bottom: 15px;"></div>', unsafe_allow_html=True)
+        
+    # SỬ DỤNG CLASS MỚI VÀ TEXT-ALIGN: CENTER
+    st.markdown(
+        f'<h3 style="color:var(--primary-color); font-size: 1.5rem; border-bottom: none; text-align: center;">NHNN VIỆT NAM</h3>', 
+        unsafe_allow_html=True
+    )
     
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
 
 # ==============================
-# HEADER CHÍNH (ĐÃ SỬA ĐỔI LẠI ĐỂ LOGO TO HƠN VÀ CĂN CHỈNH THẲNG HÀNG VỚI CHỮ)
+# HEADER CHÍNH (VIẾT LẠI TOÀN BỘ)
+# Yêu cầu: Logo to ra một tí và được thiết kế giữa của trang cạnh với chữ ngân hàng
 # ==============================
 
-# Điều chỉnh tỷ lệ cột: 1 (cho logo) và 8 (cho các tiêu đề văn bản)
-# và thêm một cột nhỏ bên trái để giúp căn chỉnh các thành phần tiêu đề vào giữa tổng thể
+# Điều chỉnh tỷ lệ cột: 1 (cho khoảng trống), 1.5 (cho logo), 7 (cho các tiêu đề văn bản), 0.5 (khoảng trống)
 col_left_spacer, col_logo, col_title_group, col_right_spacer = st.columns([1, 1.5, 7, 0.5]) 
 
 with col_logo:
     # 1. LOGO (Bên Trái - Kích thước lớn hơn)
     # Tăng chiều rộng của logo
     try:
-        st.image("logo_nhnn.png", width=150) # Tăng width lên 150 (trước đó là 120)
+        # Đường dẫn file logo và kích thước lớn hơn
+        st.image("logo_nhnn.png", width=150)
     except:
         # Giữ khoảng trống nếu không có logo để giữ bố cục
-        st.markdown(f'<div style="height: 150px;"></div>', unsafe_allow_html=True) # Điều chỉnh chiều cao tương ứng
+        st.markdown(f'<div style="height: 150px;"></div>', unsafe_allow_html=True)
 
 with col_title_group:
     # 2. TIÊU ĐỀ (Nhóm Tiêu đề nằm ở giữa)
-    primary_color = "var(--primary-color)" # #70573e Nâu Vàng
+    primary_color = "var(--primary-color)" # Lấy màu Nâu Vàng từ CSS
     
     # Sử dụng HTML/CSS để căn chỉnh nhóm văn bản theo chiều dọc
-    # và đẩy chúng sang trái một chút để "trông có vẻ" nằm giữa
-    # khi có logo bên cạnh.
     st.markdown(
         f"""
         <div style="
             display: flex; 
             flex-direction: column; 
-            justify-content: center; 
+            justify-content: center; /* Căn giữa theo chiều dọc */
             height: 100%; 
             margin-top: -15px; /* Điều chỉnh để nâng tổng thể văn bản lên một chút */
             text-align: left; /* Căn lề trái cho các dòng chữ trong nhóm này */
@@ -572,7 +611,7 @@ with col_title_group:
             <p style="
                 color: #333333; 
                 font-size: 1rem; 
-                margin-top: 5px; /* Giảm margin-top để gần hơn với dòng trên */
+                margin-top: 5px; 
                 line-height: 1.2;
             ">DBND</p>
         </div>
@@ -580,7 +619,7 @@ with col_title_group:
         unsafe_allow_html=True
     )
 
-# Các cột trống để cân đối
+# Các cột trống (giữ nguyên)
 with col_left_spacer:
     st.markdown("")
 with col_right_spacer:
@@ -588,7 +627,6 @@ with col_right_spacer:
 
 # Đường phân cách sau Header (giữ nguyên)
 st.markdown(f'<div style="height: 3px; background-color: var(--secondary-color); width: 100%;"></div>', unsafe_allow_html=True)
-
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
