@@ -197,7 +197,7 @@ hr {
     margin-bottom: 4px; 
 }
 .info-card .value { 
-    font-size: 16px; 
+    font-size: 20px; 
     line-height: 1.4; 
     white-space: pre-wrap; 
     word-break: break-word; 
