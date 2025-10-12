@@ -266,21 +266,29 @@ def rag_chat_tab():
 # ==============================
 def gemini_chat_tab(client: genai.Client):
     """Thêm khung chat Gemini kết nối qua API."""
-    st.header("🤖 External Gemini")
+    st.header("🧠 External Gemini 💬")
     st.write("Sử dụng Gemini để hỏi đáp về mọi chủ đề (tài chính, lập trình, kiến thức chung,...)")
-     if st.button("🔄 Bắt đầu phiên Chat mới", type="primary"):
-        reset_rag_chat_session()
-        return 
+    
+    # --- LOGIC RESET ---
+    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử)", type="primary"):
+        reset_gemini_chat_session()
+        return
     
     if not client:
         st.warning("Vui lòng cấu hình Khóa 'GEMINI_API_KEY' trong Streamlit Secrets để sử dụng tính năng chat.")
         return # Dừng luồng nếu không có client
     
-    # Thiết lập lịch sử trò chuyện
+    # Thiết lập lịch sử trò chuyện & biến đếm
     if "chat_messages" not in st.session_state:
         st.session_state["chat_messages"] = [
             {"role": "assistant", "content": "Xin chào! Tôi là Gemini. Bạn có câu hỏi nào muốn tôi giải đáp không?"}
         ]
+        st.session_state["gemini_chat_counter"] = 0 # Khởi tạo biến đếm
+        
+    current_count = st.session_state.get("gemini_chat_counter", 0)
+    st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
+    st.markdown("---")
+    # -------------------
 
     # Hiển thị lịch sử trò chuyện
     for message in st.session_state["chat_messages"]:
@@ -288,19 +296,24 @@ def gemini_chat_tab(client: genai.Client):
             st.markdown(message["content"])
 
     # Lấy đầu vào từ người dùng
-    if prompt := st.chat_input("Nhập câu hỏi của bạn...", key="gemini_chat_input"): # Đổi key để tránh trùng lặp
+    if prompt := st.chat_input("Nhập câu hỏi của bạn...", key="gemini_chat_input"):
         
+        # --- LOGIC KIỂM TRA GIỚI HẠN ---
+        if st.session_state.get("gemini_chat_counter", 0) >= 5:
+            with st.chat_message("assistant"):
+                st.info("Phiên trò chuyện đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
+            reset_gemini_chat_session()
+            return
+        # -------------------------------
+
         # 1. Thêm tin nhắn của người dùng vào lịch sử
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # 2. Tạo nội dung cho API (Đã sửa lỗi mapping role)
+        # 2. Tạo nội dung cho API
         history_for_api = []
-        # Bỏ qua tin nhắn chào mừng đầu tiên của assistant, nếu muốn lịch sử API chỉ chứa cặp user/model
-        # Ở đây tôi giữ toàn bộ lịch sử để tận dụng conversational memory
         for m in st.session_state.chat_messages:
-            # Map role 'assistant' (cho Streamlit) sang 'model' (cho Gemini API)
             api_role = "model" if m["role"] == "assistant" else m["role"]
             history_for_api.append({"role": api_role, "parts": [{"text": m["content"]}]})
         
@@ -308,11 +321,9 @@ def gemini_chat_tab(client: genai.Client):
         with st.chat_message("assistant"):
             with st.spinner("Đang gửi và chờ Gemini trả lời..."):
                 
-                # Thử lại với exponential backoff
                 ai_response = "Lỗi: Không nhận được phản hồi."
                 for i in range(3):
                     try:
-                        # Dùng history_for_api làm contents để duy trì lịch sử
                         response = client.models.generate_content( 
                             model='gemini-2.5-flash',
                             contents=history_for_api
@@ -324,15 +335,16 @@ def gemini_chat_tab(client: genai.Client):
                         if i < 2:
                             time.sleep(2 ** i)
                             continue
-                        break # Thoát vòng lặp sau lần thử cuối cùng
+                        break
                     except Exception as e:
                         ai_response = f"Đã xảy ra lỗi không xác định: {e}"
                         break
 
-                st.markdown(ai_response)
+            st.markdown(ai_response)
         
-        # 4. Thêm tin nhắn của AI vào lịch sử
+        # 4. Thêm tin nhắn của AI vào lịch sử và TĂNG BIẾN ĐẾM
         st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
+        st.session_state["gemini_chat_counter"] += 1 # Tăng biến đếm
 # =================================================================
 
 
