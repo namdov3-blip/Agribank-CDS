@@ -261,7 +261,7 @@ def call_gemini(messages: list):
     if "GEMINI_API_KEY" not in st.secrets:
         return "Lỗi cấu hình: Thiếu GEMINI_API_KEY trong secrets.toml."
 
-    api_key = st.secrets["GEMINI_API_KEY"]
+    api_key = st.secrets["AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc"]
     
     # Lấy tên model (ví dụ: gemini-2.5-flash)
     model_name = _get_gemini_model_name() 
@@ -284,7 +284,7 @@ def call_gemini(messages: list):
             })
 
     # Sửa URL để sử dụng tên model chính xác (tiền tố models/ được thêm ở đây)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc}"
     
     # Thêm system_instruction (nếu cần) vào payload, nhưng chỉ khi đó là tin nhắn đầu tiên
     # Lưu ý: Cấu trúc System Instruction cho API REST có thể phức tạp. 
@@ -369,7 +369,7 @@ def gemini_chat_tab():
         st.code(
             """
 # .streamlit/secrets.toml
-GEMINI_API_KEY = "your_api_key_here"
+GEMINI_API_KEY = "AIzaSyB8kzqnUMxTiBT6oG-rLHo38fbJh6XKyVc"
 # Tùy chọn: đổi model
 # GEMINI_MODEL = "gemini-2.5-pro"  # Hoặc "gemini-2.5-flash"
             """.strip(),
