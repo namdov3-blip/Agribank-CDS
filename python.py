@@ -289,9 +289,9 @@ def reset_rag_chat_session():
 
 def rag_chat_tab():
     """Thêm khung chat RAG kết nối qua n8n Webhook vào tab."""
-    st.header("🤖 Internal RAG")
+    st.header("Internal RAG")
     st.write("Sử dụng RAG Bot để hỏi đáp về dữ liệu KLTT")
-    if st.button("🔄 Bắt đầu phiên Chat mới", type="primary", key="rag_reset_button"):
+    if st.button("Bắt đầu phiên Chat mới", type="primary", key="rag_reset_button"):
         reset_rag_chat_session()
         return
 
@@ -344,11 +344,11 @@ def reset_gemini_chat_session():
 
 def gemini_chat_tab(client: genai.Client):
     """Thêm khung chat Gemini kết nối qua API."""
-    st.header("🤖 External Gemini")
+    st.header("External Gemini")
     st.write("Sử dụng Gemini để hỏi đáp về mọi chủ đề (tài chính, lập trình, kiến thức chung,...)")
     
     # --- LOGIC RESET ---
-    if st.button("🔄 Bắt đầu phiên Chat mới", type="primary", key="gemini_reset_button"):
+    if st.button("Bắt đầu phiên Chat mới", type="primary", key="gemini_reset_button"):
         reset_gemini_chat_session()
         return
     
