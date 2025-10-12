@@ -379,8 +379,8 @@ COL_MAP = {
         "structure_purpose_other_vnd": ["structure_purpose_other_vnd"],
 
         "strucuture_econ_state_vnd": ["strucuture_econ_state_vnd"],
-        "strucuture_econ_nonstate_enterprises_vnd": ["strucuture_econ_nonstate_enterprises_vnd"],
-        "strucuture_econ_individuals_households_vnd": ["strucuture_econ_individuals_households_vnd"],
+        "strucuture_econ_nonstate_enterprises_vnd": ["structure_econ_nonstate_enterprises_vnd"],
+        "strucuture_econ_individuals_households_vnd": ["structure_econ_individuals_households_vnd"],
     },
     "findings": {
         "category": ["category"],
@@ -465,7 +465,7 @@ with st.sidebar:
 # ==============================
 
 tab_docs, tab_over, tab_find, tab_act, tab_chat, tab_gemini = st.tabs(
-    ["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions", "🤖 Chatbot (RAG)", "🧠 Gemini Chat"]
+    ["Documents","Overalls","Findings","Actions", " Internal Chatbot (RAG)", "Extenal Chatbot (Gemini)"]
 )
 
 # ---- Chatbot Tab (RAG qua n8n) ----
@@ -599,8 +599,8 @@ with tab_over:
     st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
         ("DN Nhà nước", "strucuture_econ_state_vnd"),
-        ("DN tổ chức kinh tế", "strucuture_econ_nonstate_enterprises_vnd"),
-        ("DN tư nhân cá thể", "strucuture_econ_individuals_households_vnd"),
+        ("DN tổ chức kinh tế", "structure_econ_nonstate_enterprises_vnd"),
+        ("DN tư nhân cá thể", "structure_econ_individuals_households_vnd"),
     ]
     eco_data = []
     for n, c in eco_items:
@@ -665,13 +665,45 @@ with tab_find:
                 sub_df["impacted_accounts"] = sub_df["impacted_accounts"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "—")
             # Hiển thị dataframe
             st.dataframe(sub_df, use_container_width=True)
-
+        
+        st.markdown("---")
+        st.subheader("Phân tích theo bộ luật")
+        tmp = f_df.copy()
+        tmp["legal_reference"] = tmp["legal_reference_filter"]
+        cols = ["legal_reference"]
+        if "root_cause" in tmp.columns: cols.append("root_cause")
+        if "recommendation" in tmp.columns: cols.append("recommendation")
+        law_tbl = tmp[cols].drop_duplicates().reset_index(drop=True)
+        law_tbl = law_tbl.rename(columns={
+            "legal_reference":"Legal_reference",
+            "root_cause":"Root_cause",
+            "recommendation":"Recommendation"
+        })
+        st.dataframe(law_tbl, use_container_width=True)
 
 # ---- Actions (GIỮ NGUYÊN) ----
 with tab_act:
-    st.header("Kết quả Thực thi Khuyến Nghị (Actions)")
+    st.header("Biện pháp khắc phục (Actions)")
     st.markdown("---")
-    if df_act.empty:
-        st.info("Không có dữ liệu actions.")
+    if df_act is None or df_act.empty:
+        st.info("Không có sheet actions hoặc thiếu cột. Cần: action_type, legal_reference, action_description, evidence_of_completion.")
     else:
-        st.dataframe(df_act, use_container_width=True)
+        df_act_full = df_act.copy()
+        df_act_full["Legal_reference"] = coalesce_series_with_raw(df_act_full["legal_reference"], prefix="RAW")
+        # Chart
+        if "action_type" in df_act_full.columns:
+            act_count = df_act_full["action_type"].value_counts().reset_index()
+            act_count.columns = ["Action_type","Count"]
+            fig = px.pie(act_count, values="Count", names="Action_type", title="Phân loại tính chất biện pháp", hole=.35)
+            fig.update_traces(textinfo="percent+label")
+            st.plotly_chart(fig, use_container_width=True)
+        st.markdown("---")
+        # Table (all rows)
+        cols = [c for c in ["Legal_reference","action_type","action_description","evidence_of_completion"] if c in df_act_full.columns or c=="Legal_reference"]
+        rename = {
+            "action_type":"Tính chất biện pháp",
+            "action_description":"Nội dung công việc phải làm",
+            "evidence_of_completion":"Công việc chi tiết / Minh chứng"
+        }
+        st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
+st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
