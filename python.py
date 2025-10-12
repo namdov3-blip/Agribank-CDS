@@ -70,7 +70,7 @@ st.markdown("""
 </style>
 
 <div class="header-sbv">
-    <img src="nn.pnglogo_nh">
+    <img src="logo_nhnn.png">
     <div class="sub-title">Dashboard tổng hợp phân tích báo cáo</div>
     <div class="main-title">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</div>
     <div class="bottom-title">DBND</div>
