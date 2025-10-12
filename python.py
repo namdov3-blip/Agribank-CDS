@@ -1,7 +1,7 @@
 # python.py
 # Streamlit app: Dashboard trực quan hóa Kết luận Thanh tra (KLTT)
 # Chạy: streamlit run python.py
-# Yêu cầu: pip install streamlit pandas altair openpyxl plotly requests
+# Yêu cầu: pip install streamlit pandas altair openpyxl plotly requests google-genai
 
 import io
 import numpy as np
@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-import requests  # THÊM MỚI: Thư viện để gọi n8n Webhook & Gemini
+import requests  # THƯ VIỆN ĐỂ GỌI n8n Webhook
 from google import genai
 from google.genai.errors import APIError
 import time
@@ -20,6 +20,17 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- Gemini Client Initialization (ĐÃ SỬA LỖI: Thêm khởi tạo client) ---
+gemini_client = None
+if "GEMINI_API_KEY" in st.secrets:
+    try:
+        # Khởi tạo Gemini Client
+        gemini_client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    except Exception as e:
+        st.sidebar.error(f"Lỗi khởi tạo Gemini Client: Vui lòng kiểm tra GEMINI_API_KEY. Chi tiết: {e}")
+# ------------------------------------------------------------------------
+
 
 # ==============================
 # Helpers (GIỮ NGUYÊN)
@@ -251,16 +262,16 @@ def rag_chat_tab():
                 st.session_state.rag_chat_counter += 1
 
 # ==============================
-# GEMINI CHATBOT LOGIC (ĐÃ SỬA LỖI 400 BAD REQUEST)
+# GEMINI CHATBOT LOGIC (ĐÃ SỬA LỖI: Chuyển logic vào hàm)
 # ==============================
-with tab_chat:
-    
-    st.header("Trò Chuyện với Gemini 💬")
+def gemini_chat_tab(client: genai.Client):
+    """Thêm khung chat Gemini kết nối qua API."""
+    st.header("🧠 Trò Chuyện với Gemini 💬")
     st.write("Sử dụng Gemini để hỏi đáp về mọi chủ đề (tài chính, lập trình, kiến thức chung,...)")
     
-    if not gemini_client:
+    if not client:
         st.warning("Vui lòng cấu hình Khóa 'GEMINI_API_KEY' trong Streamlit Secrets để sử dụng tính năng chat.")
-        st.stop() # Dừng luồng nếu không có client
+        return # Dừng luồng nếu không có client
     
     # Thiết lập lịch sử trò chuyện
     if "chat_messages" not in st.session_state:
@@ -274,7 +285,7 @@ with tab_chat:
             st.markdown(message["content"])
 
     # Lấy đầu vào từ người dùng
-    if prompt := st.chat_input("Nhập câu hỏi của bạn..."):
+    if prompt := st.chat_input("Nhập câu hỏi của bạn...", key="gemini_chat_input"): # Đổi key để tránh trùng lặp
         
         # 1. Thêm tin nhắn của người dùng vào lịch sử
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
@@ -283,6 +294,8 @@ with tab_chat:
 
         # 2. Tạo nội dung cho API (Đã sửa lỗi mapping role)
         history_for_api = []
+        # Bỏ qua tin nhắn chào mừng đầu tiên của assistant, nếu muốn lịch sử API chỉ chứa cặp user/model
+        # Ở đây tôi giữ toàn bộ lịch sử để tận dụng conversational memory
         for m in st.session_state.chat_messages:
             # Map role 'assistant' (cho Streamlit) sang 'model' (cho Gemini API)
             api_role = "model" if m["role"] == "assistant" else m["role"]
@@ -296,14 +309,14 @@ with tab_chat:
                 ai_response = "Lỗi: Không nhận được phản hồi."
                 for i in range(3):
                     try:
-                        response = gemini_client.models.generate_content(
+                        # Dùng history_for_api làm contents để duy trì lịch sử
+                        response = client.models.generate_content( 
                             model='gemini-2.5-flash',
                             contents=history_for_api
                         )
                         ai_response = response.text
                         break
                     except APIError as e:
-                        # Thay đổi cách hiển thị lỗi để rõ ràng hơn
                         ai_response = f"Lỗi gọi API ({e.args[0]}): Vui lòng kiểm tra API key hoặc giới hạn sử dụng."
                         if i < 2:
                             time.sleep(2 ** i)
@@ -315,8 +328,10 @@ with tab_chat:
 
                 st.markdown(ai_response)
         
-# 4. Thêm tin nhắn của AI vào lịch sử
+        # 4. Thêm tin nhắn của AI vào lịch sử
         st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
+# =================================================================
+
 
 # ==============================
 # Column mappings (GIỮ NGUYÊN)
@@ -450,16 +465,16 @@ with st.sidebar:
 # ==============================
 
 tab_docs, tab_over, tab_find, tab_act, tab_chat, tab_gemini = st.tabs(
-    ["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions", "🤖 Chatbot", "🧠 Gemini"]
+    ["📝 Documents","📊 Overalls","🚨 Findings","✅ Actions", "🤖 Chatbot (RAG)", "🧠 Gemini Chat"]
 )
 
 # ---- Chatbot Tab (RAG qua n8n) ----
 with tab_chat:
     rag_chat_tab()
 
-# ---- Gemini Tab (MỚI) ----
+# ---- Gemini Tab (ĐÃ SỬA LỖI: Gọi hàm với client) ----
 with tab_gemini:
-    gemini_chat_tab()
+    gemini_chat_tab(gemini_client)
 
 # ---- Documents (GIỮ NGUYÊN) ----
 with tab_docs:
