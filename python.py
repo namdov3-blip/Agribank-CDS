@@ -508,31 +508,115 @@ with st.sidebar:
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
 
+# python.py (Chỉ thay đổi khu vực HEADER CHÍNH)
+
+# ... (Giữ nguyên các đoạn code trên: import, st.set_page_config, CSS root, info_card,...)
+
 # ==============================
-# HEADER CHÍNH (ĐÃ THIẾT KẾ LẠI)
+# HEADER CHÍNH (ĐÃ SỬA: Căn giữa, thêm nền mờ)
 # ==============================
 
-col_logo, col_title, col_spacer = st.columns([5, 5, 2])
+# Khai báo Background URL và Blur Amount (Sử dụng ảnh logo_nhnn_background.png)
+# Bạn cần đảm bảo file ảnh này (hoặc bất kỳ ảnh nào bạn muốn dùng làm nền) nằm trong thư mục gốc của ứng dụng Streamlit.
+BACKGROUND_IMAGE_URL = "logo_nhnn_background.png" # Đặt tên file ảnh nền của bạn
+BLUR_AMOUNT = "4px" # Độ mờ của nền
 
-with col_logo:
-    # Gợi ý: Lưu logo NHNN dạng ban đầu vào file logo_nhnn.png
-    # Thay thế "logo_nhnn.png" bằng đường dẫn file logo của bạn.
-    try:
-        st.image("logo_nhnn.png", width=200) 
-    except:
-        st.markdown(f'<div style="height: 120px;"></div>', unsafe_allow_html=True)
+# Bọc Header trong một container để dễ dàng áp dụng background CSS
+with st.container():
+    # --- CSS cho Container Header có nền mờ ---
+    st.markdown(
+        f"""
+        <style>
+        .header-container {{
+            /* Kích thước và căn chỉnh */
+            width: 100%;
+            padding: 20px 0;
+            margin: 10px 0;
+            border-radius: 15px; /* Bo góc */
+            overflow: hidden; /* Quan trọng để blur không tràn ra ngoài */
+            position: relative;
+            z-index: 1; /* Đảm bảo nội dung nằm trên nền */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Thêm bóng nhẹ */
+        }}
 
-with col_title:
-     # Sử dụng CSS để căn giữa và áp dụng màu Nâu Vàng
-    header_style = "text-align: center; color: var(--primary-color); margin-bottom: 0px;"
+        .header-container::before {{
+            /* Lớp giả tạo Background */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            
+            /* Ảnh nền */
+            background-image: url({BACKGROUND_IMAGE_URL});
+            background-size: cover;
+            background-position: center;
+            opacity: 0.3; /* Độ trong suốt của ảnh nền */
+            z-index: -1; /* Đặt nền xuống dưới */
+            
+            /* Hiệu ứng làm mờ */
+            filter: blur({BLUR_AMOUNT});
+            transform: scale(1.05); /* Phóng to nhẹ để tránh viền mờ */
+        }}
+
+        /* Đảm bảo nội dung chữ luôn nằm trên nền */
+        .header-content-center {{
+            position: relative;
+            z-index: 2;
+        }}
+        
+        /* Căn giữa tiêu đề bên trong */
+        .header-content-center h1, 
+        .header-content-center p {{
+            text-align: center;
+            color: var(--primary-color) !important; /* Đảm bảo màu chữ hiển thị tốt */
+        }}
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    # ---------------------------------------------
     
-    st.markdown(f'<p style="{header_style} font-size: 1.1rem; font-weight: 500; margin-top: 15px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', unsafe_allow_html=True)
-    
-    # Tiêu đề chính to nhất
-    st.markdown(f'<h1 style="{header_style} font-size: 2.8rem; margin-top: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', unsafe_allow_html=True)
-    
-    # DBND
-    st.markdown(f'<p style="{header_style} font-size: 1rem; margin-top: -10px;">DBND</p>', unsafe_allow_html=True)
+    # Dùng 3 cột để CĂN GIỮA TOÀN BỘ NỘI DUNG (Logo + Text)
+    # Tỷ lệ 1.5, 7, 1.5 để cân bằng
+    col_left_spacer, col_center, col_right_spacer = st.columns([1.5, 7, 1.5]) 
+
+    # Nội dung chính (Logo và Text) sẽ nằm trong col_center
+    with col_center:
+        # Bọc Logo và Tiêu đề trong một div để áp dụng style căn giữa
+        st.markdown('<div class="header-content-center">', unsafe_allow_html=True)
+        
+        # --- Cấu trúc Logo và Tiêu đề Căn giữa ---
+        # Dùng 3 cột phụ để căn logo và text bên trong col_center
+        logo_c_left, logo_c, logo_c_right = st.columns([1, 2, 5]) # Tỷ lệ: Logo (căn trái) : Text (căn phải trong col_center)
+        
+        with logo_c:
+            # 1. LOGO (Căn trái trong khối giữa)
+            try:
+                # Tăng kích thước logo lớn hơn
+                st.image("logo_nhnn.png", width=120) 
+            except:
+                st.markdown(f'<div style="height: 120px;"></div>', unsafe_allow_html=True) 
+        
+        with logo_c_right:
+            # 2. TIÊU ĐỀ (Căn giữa so với Logo)
+            primary_color = "var(--primary-color)"
+            
+            # Sử dụng các thẻ đã được định nghĩa trong CSS (header-content-center h1/p)
+            # Không cần inline style cho text-align: center nữa vì đã có class
+            st.markdown(f'<p style="font-size: 1.1rem; font-weight: 500; margin-top: 25px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', unsafe_allow_html=True)
+            st.markdown(f'<h1 style="font-size: 2.8rem; margin-top: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', unsafe_allow_html=True)
+            st.markdown(f'<p style="font-size: 1rem; margin-top: -10px;">DBND</p>', unsafe_allow_html=True)
+        # ----------------------------------------
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Đường phân cách sau Header (có thể thay bằng viền đỏ như ảnh mẫu)
+st.markdown(f'<div style="height: 3px; background-color: var(--secondary-color); width: 100%;"></div>', unsafe_allow_html=True)
+
+# ... (Giữ nguyên các đoạn code còn lại)
 
 st.markdown("---") # Đường phân cách sau Header
 
