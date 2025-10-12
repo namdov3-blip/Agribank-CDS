@@ -507,15 +507,15 @@ with st.sidebar:
 # HEADER CHÍNH (ĐÃ THIẾT KẾ LẠI)
 # ==============================
 
-col_logo, col_title = st.columns([1, 8])
+col_logo, col_title, col_spacer = st.columns([2, 5, 2])
 
 with col_logo:
     # Gợi ý: Lưu logo NHNN dạng ban đầu vào file logo_nhnn.png
     # Thay thế "logo_nhnn.png" bằng đường dẫn file logo của bạn.
     try:
-        st.image("logo_nhnn.png", width=75) 
+        st.image("logo_nhnn.png", width=120) 
     except:
-        st.markdown(f'<div style="height: 75px;"></div>', unsafe_allow_html=True) # Giữ khoảng trống nếu không có logo
+        st.markdown(f'<div style="height: 120px;"></div>', unsafe_allow_html=True)
 
 with col_title:
     st.markdown(f'<h3 style="color:#a50000; margin-bottom: -15px; font-weight: 500;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</h3>', unsafe_allow_html=True)
