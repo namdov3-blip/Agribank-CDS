@@ -145,8 +145,13 @@ def make_pie(labels_vals, title="", height=260):
 st.markdown("""
 <style>
 :root { 
-    --primary-color: #1f6feb; /* Xanh Chủ đạo */
-    --secondary-color: #a50000; /* Đỏ Đô */
+    --primary-color: #70573e; /* Màu Nâu Vàng từ logo (Chủ đạo) */
+    --secondary-color: #a50000; /* Màu Đỏ Đô (Nhấn mạnh: Biểu đồ, Alert) */
+    --background-light: #fafaf4; /* Nền kem nhẹ */
+}
+/* Áp dụng nền kem cho toàn bộ trang */
+[data-testid="stAppViewContainer"] {
+    background-color: var(--background-light);
 }
 /* Tiêu đề tổng quát */
 h1, h2, h3, h4 {
@@ -507,7 +512,7 @@ with st.sidebar:
 # HEADER CHÍNH (ĐÃ THIẾT KẾ LẠI)
 # ==============================
 
-col_logo, col_title, col_spacer = st.columns([2, 5, 2])
+col_logo, col_title, col_spacer = st.columns([5, 5, 2])
 
 with col_logo:
     # Gợi ý: Lưu logo NHNN dạng ban đầu vào file logo_nhnn.png
