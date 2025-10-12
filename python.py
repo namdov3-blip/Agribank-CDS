@@ -144,64 +144,96 @@ def make_pie(labels_vals, title="", height=260):
 
 st.markdown("""
 <style>
-:root { 
-    --primary-color: #70573e; /* Màu Nâu Vàng từ logo (Chủ đạo) */
-    --background-light: #fafaf4; /* Nền kem nhẹ */
+:root { 
+    --primary-color: #70573e; /* Màu Nâu Vàng từ logo (Chủ đạo) */
+    --background-light: #fafaf4; /* Nền kem nhẹ */
 }
 /* Áp dụng nền kem cho toàn bộ trang */
 [data-testid="stAppViewContainer"] {
-    background-color: var(--background-light);
+    background-color: var(--background-light);
 }
-
-/* --- PHẦN MỚI QUAN TRỌNG: CĂN GIỮA TOÀN BỘ NỘI DUNG (KỂ CẢ HEADER) --- */
-/* Căn giữa nội dung trong container chính của trang */
-.main [data-testid="block-container"] {
-    display: flex;
-    flex-direction: column;
-    align-items: center; /* Căn giữa theo chiều ngang cho tất cả block con */
+/* Tiêu đề tổng quát */
+h1, h2, h3, h4 {
+    color: var(--primary-color);
 }
-
-/* --- PHẦN MỚI QUAN TRỌNG: CĂN GIỮA THANH TABS --- */
-/* Streamlit bọc Tabs trong một cấu trúc phức tạp, cần dùng bộ chọn chính xác */
-/* Đây là thẻ cha của thanh chứa các button tabs, áp dụng Flexbox để căn giữa */
-[data-testid="stHeader"] + div [data-testid="stVerticalBlock"] > div:nth-child(1) > div:nth-child(1) {
-    display: flex !important;
-    justify-content: center !important; /* CĂN GIỮA TOÀN BỘ THANH TABS */
-}
-
-/* --- PHẦN MỚI QUAN TRỌNG: PHÓNG TO CỠ CHỮ CỦA TỪNG TAB BUTTON --- */
-/* Phóng to font chữ của từng tab */
-button[data-testid^="stTab"] {
-    font-size: 1.5rem !important; /* TĂNG CỠ CHỮ LÊN MỨC RẤT LỚN (1.5rem ~ 24px) */
-    font-weight: 700 !important; /* Tăng độ đậm */
-    padding: 10px 25px !important; /* Tăng padding để tab to hơn */
-    white-space: nowrap; /* Ngăn ngắt dòng */
-    color: var(--primary-color) !important; /* Đổi màu chữ Tab sang màu chủ đạo */
-}
-
-/* Ẩn dấu ba chấm (Menu Hamburger) nếu không dùng */
-.css-1oe2kpy, .css-1y4pm5c {
-    visibility: hidden;
-}
-
-/* Điều chỉnh tiêu đề chính để căn giữa tuyệt đối */
 h1 {
-    text-align: center !important;
-    color: var(--primary-color) !important;
-    margin-top: 1.5rem !important;
-    font-size: 2.5rem !important; /* Làm lớn tiêu đề chính */
+    font-size: 2.2rem;
+    font-weight: 700;
 }
 h2 {
-    text-align: center !important;
-    color: var(--primary-color) !important;
+    font-size: 1.8rem;
+    border-bottom: 2px solid #e6e6e6; /* Đường phân cách nhẹ */
+    padding-bottom: 5px;
+    margin-top: 1.5rem;
+}
+/* Thanh phân cách */
+hr {
+    border-top: 1px solid var(--primary-color); /* Màu xanh chủ đạo */
 }
 
-/* Căn giữa các thẻ cha chứa Tiêu đề phụ (như DBNG, DASHBOARD TỔNG HỢP) */
-[data-testid="stText"] {
-    width: 100%;
-    text-align: center;
-    color: #888888;
-    font-size: 0.9rem;
+/* Dataframe */
+[data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+}
+
+/* Info Card */
+.info-card{
+  position: relative;
+  display: block;
+  padding: 16px 18px 14px 18px; /* đủ thoáng */
+  background: #fff;
+  border: 3px solid var(--border-color);   /* viền bao quanh */
+  border-left: 8px solid var(--primary-color); /* điểm nhấn màu chủ đạo */
+  border-radius: 16px;
+  min-height: 72px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.02);
+}
+.info-card .label { 
+    font-size: 20px; 
+    color: var(--primary-color); 
+    font-weight: 700; 
+    margin-bottom: 4px; 
+}
+.info-card .value { 
+    font-size: 20px; 
+    line-height: 1.4; 
+    white-space: pre-wrap; 
+    word-break: break-word; 
+    font-weight: 600;
+}
+
+/* Document Wrap */
+.doc-wrap { 
+    padding: 15px; 
+    border: 1px solid var(--primary-color); 
+    border-radius: 12px; 
+    background: #fff0f0; /* Nền rất nhạt */
+    margin-bottom: 14px; 
+}
+.doc-title { 
+    font-weight: 700; 
+    font-size: 18px; 
+    color: var(--primary-color);
+    margin-bottom: 10px; 
+}
+
+/* Căn giữa các tabs bằng cách điều chỉnh flexbox của container */
+[data-testid="stTabs"] > div {
+    justify-content: center !important; 
+    gap: 60px; /* Thêm khoảng cách giữa các tab */
+}
+/* Phóng to font chữ của từng tab */
+button[data-testid^="stTab"] {
+    font-size: 5rem !important; /* Cỡ chữ lớn hơn */
+    font-weight: 14000; /* Làm chữ đậm hơn */
+    padding: 20px 40px; /* Tăng padding để tab to hơn */
+}
+/* Tabs Accent */
+button[data-testid^="stTab"]:focus {
+    color: var(--primary-color) !important; 
+    border-bottom: 2px solid var(--primary-color) !important; 
 }
 </style>
 """, unsafe_allow_html=True)
@@ -472,7 +504,7 @@ COL_MAP = {
 }
 
 # ==============================
-# Sidebar (Upload + Filters)
+# Sidebar (Upload + Filters) (ĐÃ THÊM LOGO VÀ TIÊU ĐỀ)
 # ==============================
 
 with st.sidebar:
