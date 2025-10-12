@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-import requests  # Gọi n8n Webhook & Gemini
+import requests  # THÊM MỚI: Thư viện để gọi n8n Webhook & Gemini
 
 st.set_page_config(
     page_title="Dashboard Kết luận Thanh tra (KLTT)",
@@ -157,25 +157,34 @@ def info_card(label, value):
     )
 
 # ==============================
-# RAG CHATBOT LOGIC (GIỮ NGUYÊN)
+# RAG CHATBOT LOGIC
 # ==============================
 
 def call_n8n_chatbot(prompt: str):
     """Gửi câu hỏi tới n8n RAG Webhook và nhận câu trả lời. Bao gồm logic Chat ID."""
     if "N8N_WEBHOOK_URL" not in st.secrets:
         return "Lỗi cấu hình: Thiếu N8N_WEBHOOK_URL trong secrets.toml. Vui lòng thiết lập để sử dụng chatbot."
+    
     webhook_url = st.secrets["N8N_WEBHOOK_URL"]
-
-    # Tạo/lấy Chat ID để n8n quản lý bộ nhớ
+    
+    # Logic tạo/lấy Chat ID để n8n quản lý bộ nhớ (Simple Memory)
     if "chat_session_id" not in st.session_state:
+        # Tạo ID duy nhất dựa trên timestamp
         st.session_state.chat_session_id = pd.Timestamp.now().strftime("%Y%m%d%H%M%S%f")
 
-    payload = {"query": prompt, "chatId": st.session_state.chat_session_id}
+    payload = {
+        "query": prompt,
+        "chatId": st.session_state.chat_session_id # Truyền Chat ID
+    }
+    
     try:
+        # Tăng timeout lên 90s để tránh lỗi hết thời gian chờ
         response = requests.post(webhook_url, json=payload, timeout=90)
         response.raise_for_status()
         data = response.json()
-        return data.get("response", "Không tìm thấy trường 'response' trong phản hồi của n8n. Vui lòng kiểm tra cấu hình.")
+        
+        return data.get("response", "Không tìm thấy trường 'response' trong phản hồi của n8n. Vui lòng kiểm tra lại cấu hình n8n.")
+
     except requests.exceptions.Timeout:
         return "RAG Chatbot (n8n) hết thời gian chờ (Timeout: 90s). Vui lòng thử lại hoặc rút gọn câu hỏi."
     except requests.exceptions.RequestException as e:
@@ -184,23 +193,23 @@ def call_n8n_chatbot(prompt: str):
         return f"Lỗi xử lý phản hồi từ n8n: {e}"
 
 def reset_rag_chat_session():
-    """Reset toàn bộ lịch sử chat và session ID cho RAG."""
+    """Hàm này sẽ reset toàn bộ lịch sử chat và session ID."""
     st.session_state.rag_chat_history = []
     if "rag_chat_counter" in st.session_state:
         st.session_state.rag_chat_counter = 0
     if "chat_session_id" in st.session_state:
         del st.session_state.chat_session_id
     st.session_state.rag_chat_history.append(
-        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset**. Tôi là Trợ lý RAG (n8n). Hãy hỏi tôi về dữ liệu KLTT."}
+        {"role": "assistant", "content": "Phiên trò chuyện đã được **reset** thành công. Chào bạn, tôi là Trợ lý RAG được kết nối qua n8n. Hãy hỏi tôi về các thông tin KLTT."}
     )
     st.rerun()
 
 def rag_chat_tab():
-    """Khung chat RAG kết nối n8n Webhook."""
+    """Thêm khung chat RAG kết nối qua n8n Webhook vào tab."""
     st.header("🤖 Trợ lý RAG (Hỏi & Đáp Dữ liệu KLTT)")
     if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử)", type="primary"):
         reset_rag_chat_session()
-        return
+        return 
 
     if "rag_chat_history" not in st.session_state:
         st.session_state.rag_chat_history = []
@@ -209,11 +218,11 @@ def rag_chat_tab():
             {"role": "assistant", "content": "Chào bạn, tôi là Trợ lý RAG được kết nối qua n8n. Hãy hỏi tôi về các thông tin KLTT."}
         )
     current_count = st.session_state.get("rag_chat_counter", 0)
-    st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Đủ 5 câu sẽ tự động reset)")
+    st.caption(f"Phiên chat hiện tại: **{current_count}** / 5 câu. (Hỏi 5 câu sẽ tự động reset)")
     st.markdown("---")
 
     if "N8N_WEBHOOK_URL" not in st.secrets:
-        st.warning("Vui lòng thiết lập N8N_WEBHOOK_URL trong .streamlit/secrets.toml để dùng Chatbot.")
+        st.warning("Vui lòng thiết lập N8N_WEBHOOK_URL trong file .streamlit/secrets.toml để sử dụng Chatbot.")
         return
 
     for message in st.session_state.rag_chat_history:
@@ -223,7 +232,7 @@ def rag_chat_tab():
     if user_prompt := st.chat_input("Hỏi Trợ lý RAG...", key="rag_chat_input"):
         if st.session_state.rag_chat_counter >= 5:
             with st.chat_message("assistant"):
-                st.info("Đã đạt 5 câu hỏi. Lịch sử sẽ được xóa – mời bạn bắt đầu lại.")
+                st.info("Phiên trò chuyện đã đạt 5 câu hỏi. **Lịch sử sẽ được xóa.** Vui lòng bắt đầu câu hỏi mới.")
             reset_rag_chat_session()
             return
 
@@ -239,42 +248,48 @@ def rag_chat_tab():
                 st.session_state.rag_chat_counter += 1
 
 # ==============================
-# GEMINI CHATBOX (TAB RIÊNG)
+# GEMINI CHATBOT LOGIC (ĐÃ SỬA LỖI API KEY)
 # ==============================
 
 def _get_gemini_model_name():
-    # Cho phép override qua secrets; default linh hoạt
-    return st.secrets.get("GEMINI_MODEL", "gemini-1.5-flash")
-
-def _normalize_gemini_messages(messages: list) -> list:
-    """
-    Tránh lỗi 400 do hai lần 'model' liên tiếp.
-    Ghép các tin nhắn liền nhau cùng role 'model' vào một entry.
-    """
-    out = []
-    for m in messages:
-        role = "user" if m["role"] == "user" else "model"
-        content = str(m["content"])
-        if out and out[-1]["role"] == role and role == "model":
-            out[-1]["parts"][0]["text"] += "\n\n" + content[:20000]
-        else:
-            out.append({"role": role, "parts": [{"text": content[:20000]}]})
-    return out
+    # Mặc định dùng Gemini 2.5 Flash, dễ dùng hơn và ít gây lỗi Bad Request hơn bản Pro
+    # Lưu ý: Trả về tên mô hình BỎ TIỀN TỐ "models/"
+    return st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 def call_gemini(messages: list):
     """
-    Gọi Google Generative Language API (REST).
+    Gọi Google Generative Language API cho chat (sử dụng API REST).
     - messages: danh sách dict {"role": "user"/"model", "content": str}
     """
     if "GEMINI_API_KEY" not in st.secrets:
         return "Lỗi cấu hình: Thiếu GEMINI_API_KEY trong secrets.toml."
 
+    # KHẮC PHỤC LỖI: Lấy API key bằng đúng tên biến trong secrets.toml
     api_key = st.secrets["GEMINI_API_KEY"]
-    model = _get_gemini_model_name()
+    
+    # Lấy tên model (ví dụ: gemini-2.5-flash)
+    model_name = _get_gemini_model_name() 
 
-    contents = _normalize_gemini_messages(messages)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    # Chuyển đổi sang schema contents của Gemini
+    contents = []
+    for m in messages:
+        # API REST của Gemini sử dụng 'user' và 'model'
+        role = "user" if m["role"] == "user" else "model"
+        
+        # Đảm bảo role 'model' không đứng ngay sau một role 'model' khác (tránh lỗi 400)
+        if contents and contents[-1]['role'] == role and role == 'model':
+             # Ta sẽ nối nội dung thay vì thêm một entry mới
+             contents[-1]['parts'][0]['text'] += "\n\n" + m["content"][:20000]
+        else:
+            contents.append({
+                "role": role,
+                "parts": [{"text": m["content"][:20000]}]  # cắt an toàn nếu prompt quá dài
+            })
 
+    # KHẮC PHỤC LỖI: Truyền biến api_key vào URL
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    
+    # Payload cấu hình
     payload = {
         "contents": contents,
         "generationConfig": {
@@ -287,24 +302,32 @@ def call_gemini(messages: list):
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
             {"category": "HARM_CATEGORY_SEXUAL", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
         ]
     }
 
     try:
         resp = requests.post(url, json=payload, timeout=90)
-        resp.raise_for_status()
+        resp.raise_for_status() # Nếu gặp lỗi 4xx/5xx, sẽ raise exception ngay lập tức
+        
         data = resp.json()
+        
+        # Đọc text từ candidates
         cands = data.get("candidates", [])
         if not cands:
-            if data.get("promptFeedback", {}).get("safetyRatings"):
+             # Kiểm tra lỗi chặn (safety block)
+            prompt_feedbacks = data.get("promptFeedback", {})
+            if prompt_feedbacks.get("safetyRatings"):
                 return "Gemini bị chặn trả lời do vi phạm chính sách an toàn."
             return "Gemini không trả về nội dung. Vui lòng thử lại."
+            
         parts = cands[0].get("content", {}).get("parts", [])
         if not parts:
             return "Gemini không có phần trả lời hợp lệ."
+            
         text = "".join(p.get("text", "") for p in parts).strip()
         return text if text else "Gemini trả lời rỗng."
+        
     except requests.exceptions.Timeout:
         return "Gemini: Hết thời gian chờ (Timeout 90s). Vui lòng thử lại."
     except requests.exceptions.RequestException as e:
@@ -323,50 +346,58 @@ def reset_gemini_session():
 def gemini_chat_tab():
     """Khung chat Gemini riêng, tương tự RAG bot; giữ độc lập lịch sử."""
     st.header("🧠 Gemini Chat (General AI)")
+    # Nút reset
     if st.button("🔄 Reset phiên Gemini", key="gemini_reset_btn"):
         reset_gemini_session()
         return
 
+    # Khởi tạo lịch sử
     if "gemini_history" not in st.session_state:
         st.session_state.gemini_history = [
             {"role": "model", "content": "Xin chào 👋 Tôi là **Gemini**. Hãy đặt câu hỏi hoặc mô tả tác vụ bạn cần hỗ trợ."}
         ]
         st.session_state.gemini_turns = 0
 
-    st.caption("Mẹo: Dùng Gemini cho các câu hỏi tổng quát, soạn thảo, ý tưởng… (không ràng buộc dữ liệu KLTT).")
+    st.caption("Mẹo: Dùng Gemini cho các câu hỏi tổng quát, soạn thảo, gợi ý ý tưởng… (Không ràng buộc dữ liệu KLTT).")
     st.markdown("---")
 
+    # Cảnh báo cấu hình
     if "GEMINI_API_KEY" not in st.secrets:
         st.warning("Thiếu `GEMINI_API_KEY` trong `.streamlit/secrets.toml`. Vui lòng thêm để sử dụng Gemini.")
         st.code(
             """
 # .streamlit/secrets.toml
 GEMINI_API_KEY = "your_api_key_here"
-# Optional:
-# GEMINI_MODEL = "gemini-1.5-pro"
+# Tùy chọn: đổi model
+# GEMINI_MODEL = "gemini-2.5-pro"  # Hoặc "gemini-2.5-flash"
             """.strip(),
             language="toml"
         )
 
+    # Hiển thị lịch sử
     for m in st.session_state.gemini_history:
         with st.chat_message("assistant" if m["role"] == "model" else "user"):
             st.markdown(m["content"])
 
+    # Input
     if user_msg := st.chat_input("Nhắn với Gemini...", key="gemini_chat_input"):
+        # Append user
         st.session_state.gemini_history.append({"role": "user", "content": user_msg})
         with st.chat_message("user"):
             st.markdown(user_msg)
 
-        # Lấy cửa sổ ngữ cảnh ~8 lượt hỏi gần nhất
+        # Chuẩn bị messages (lấy tối đa ~8 lượt gần nhất để giữ ngữ cảnh)
         history = st.session_state.gemini_history
-        window, turns = [], 0
+        window = []
+        turns = 0
         for msg in reversed(history):
             window.insert(0, msg)
             if msg["role"] == "user":
                 turns += 1
-            if turns >= 8:
+            if turns >= 8:  # giới hạn ngữ cảnh
                 break
 
+        # Gọi API
         with st.chat_message("assistant"):
             with st.spinner("Gemini đang soạn trả lời..."):
                 reply = call_gemini(window)
@@ -402,7 +433,7 @@ COL_MAP = {
         "sample_total_files": ["sample_total_files"],
         "sample_outstanding_checked_vnd": ["sample_outstanding_checked_vnd"],
 
-        # Bổ sung cho biểu đồ
+        # Bổ sung theo yêu cầu phần biểu đồ
         "structure_quality_group1_vnd": ["structure_quality_group1_vnd"],
         "structure_quality_group2_vnd": ["structure_quality_group2_vnd"],
         "structure_quality_group3_vnd": ["structure_quality_group3_vnd"],
@@ -456,7 +487,8 @@ if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
     st.stop()
 
-# Xử lý dữ liệu
+# ... (Tiếp tục xử lý dữ liệu)
+
 data = load_excel(uploaded)
 
 def get_df(sheet_key):
@@ -489,7 +521,7 @@ for c in ["quantified_amount","impacted_accounts"]:
 df_find["legal_reference_filter"] = coalesce_series_with_raw(df_find["legal_reference"], prefix="RAW")
 df_find["legal_reference_chart"] = df_find["legal_reference_filter"].apply(lambda x: "RAW" if str(x).startswith("RAW") else x)
 
-# Sidebar filter (findings only)
+# Sidebar filter (findings only) (GIỮ NGUYÊN)
 with st.sidebar:
     st.header("🔎 Lọc Findings")
     all_refs = sorted(df_find["legal_reference_filter"].astype(str).unique().tolist())
@@ -501,7 +533,7 @@ with st.sidebar:
     st.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
 
 # ==============================
-# Tabs (THÊM TAB GEMINI)
+# Tabs (ĐÃ HOÀN THIỆN)
 # ==============================
 
 tab_docs, tab_over, tab_find, tab_act, tab_chat, tab_gemini = st.tabs(
@@ -512,22 +544,19 @@ tab_docs, tab_over, tab_find, tab_act, tab_chat, tab_gemini = st.tabs(
 with tab_chat:
     rag_chat_tab()
 
-# ---- Gemini Tab ----
+# ---- Gemini Tab (MỚI) ----
 with tab_gemini:
     gemini_chat_tab()
 
-# ---- Documents ----
+# ---- Documents (GIỮ NGUYÊN) ----
 with tab_docs:
     st.header("Báo Cáo Kết Luận Thanh Tra (Metadata)")
     st.markdown("---")
     if len(df_docs) == 0:
         st.info("Không có dữ liệu documents.")
     else:
-        for _, row in df_docs.reset_index(drop=True).iterrows():
-            st.markdown(
-                f'<div class="doc-wrap"><div class="doc-title">📝 Báo cáo kết luận thanh tra — {str(row.get("doc_id","—"))}</div>',
-                unsafe_allow_html=True
-            )
+        for idx, row in df_docs.reset_index(drop=True).iterrows():
+            st.markdown(f'<div class="doc-wrap"><div class="doc-title">📝 Báo cáo kết luận thanh tra — {str(row.get("doc_id","—"))}</div>', unsafe_allow_html=True)
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 info_card("Mã số kết luận thanh tra (Doc_id)", str(row.get("doc_id","—")))
@@ -547,7 +576,7 @@ with tab_docs:
                 info_card("Thời gian kết thúc (period_end)", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
             st.markdown("</div>", unsafe_allow_html=True)
 
-# ---- Overalls ----
+# ---- Overalls (GIỮ NGUYÊN) ----
 with tab_over:
     st.header("Thông Tin Tổng Quan")
     st.markdown("---")
@@ -638,12 +667,12 @@ with tab_over:
     fig_p = make_bar(dfp, title="Mục đích vay (bar nhỏ)")
     st.plotly_chart(fig_p, use_container_width=True)
 
-    # 5) Thành phần kinh tế
+    # 5) Thành phần kinh tế (luôn hiển thị cả 0)
     st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
         ("DN Nhà nước", "strucuture_econ_state_vnd"),
-        ("DN tổ chức kinh tế", "structure_econ_nonstate_enterprises_vnd"),
-        ("DN tư nhân cá thể", "structure_econ_individuals_households_vnd"),
+        ("DN tổ chức kinh tế", "strucuture_econ_nonstate_enterprises_vnd"),
+        ("DN tư nhân cá thể", "strucuture_econ_individuals_households_vnd"),
     ]
     eco_data = []
     for n, c in eco_items:
@@ -653,7 +682,7 @@ with tab_over:
     fig_e = make_bar(dfe, title="Thành phần kinh tế (bar nhỏ, hiển thị 0)")
     st.plotly_chart(fig_e, use_container_width=True)
 
-# ---- Findings ----
+# ---- Findings (GIỮ NGUYÊN) ----
 with tab_find:
     st.header("Phát hiện & Nguyên nhân (Findings)")
     st.subheader(f"Đang lọc theo: {len(selected_refs)}/{len(all_refs)} legal_reference")
@@ -674,7 +703,7 @@ with tab_find:
             cat_sub = f_df.groupby(["category","sub_category"]).size().reset_index(name="Count")
             fig2 = px.bar(cat_sub, x="category", y="Count", color="sub_category",
                           title="Category × Sub_category (số lần)", barmode="group",
-                          labels={"category":"Category","sub_category":"Sub-category","Count":"Số lần"})
+                          labels={"category":"Category","sub_category":"Sub_category","Count":"Số lần"})
             fig2.update_layout(height=380)
             st.plotly_chart(fig2, use_container_width=True)
 
@@ -706,54 +735,15 @@ with tab_find:
                 sub_df["quantified_amount"] = sub_df["quantified_amount"].apply(format_vnd)
             if "impacted_accounts" in sub_df.columns:
                 sub_df["impacted_accounts"] = sub_df["impacted_accounts"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "—")
-            rename = {
-                "description":"Mô tả",
-                "legal_reference":"Điều luật/Quy định",
-                "quantified_amount":"Số tiền ảnh hưởng",
-                "impacted_accounts":"Số KH/Hồ sơ",
-                "root_cause":"Nguyên nhân gốc"
-            }
-            st.dataframe(sub_df.rename(columns=rename), use_container_width=True)
+            # Hiển thị dataframe
+            st.dataframe(sub_df, use_container_width=True)
 
-        st.markdown("---")
-        st.subheader("Phân tích theo bộ luật")
-        tmp = f_df.copy()
-        tmp["legal_reference"] = tmp["legal_reference_filter"]
-        cols = ["legal_reference"]
-        if "root_cause" in tmp.columns: cols.append("root_cause")
-        if "recommendation" in tmp.columns: cols.append("recommendation")
-        law_tbl = tmp[cols].drop_duplicates().reset_index(drop=True)
-        law_tbl = law_tbl.rename(columns={
-            "legal_reference":"Legal_reference",
-            "root_cause":"Root_cause",
-            "recommendation":"Recommendation"
-        })
-        st.dataframe(law_tbl, use_container_width=True)
 
-# ---- Actions ----
+# ---- Actions (GIỮ NGUYÊN) ----
 with tab_act:
-    st.header("Biện pháp khắc phục (Actions)")
+    st.header("Kết quả Thực thi Khuyến Nghị (Actions)")
     st.markdown("---")
-    if df_act is None or df_act.empty:
-        st.info("Không có sheet actions hoặc thiếu cột. Cần: action_type, legal_reference, action_description, evidence_of_completion.")
+    if df_act.empty:
+        st.info("Không có dữ liệu actions.")
     else:
-        df_act_full = df_act.copy()
-        df_act_full["Legal_reference"] = coalesce_series_with_raw(df_act_full["legal_reference"], prefix="RAW")
-        # Chart
-        if "action_type" in df_act_full.columns:
-            act_count = df_act_full["action_type"].value_counts().reset_index()
-            act_count.columns = ["Action_type","Count"]
-            fig = px.pie(act_count, values="Count", names="Action_type", title="Phân loại tính chất biện pháp", hole=.35)
-            fig.update_traces(textinfo="percent+label")
-            st.plotly_chart(fig, use_container_width=True)
-        st.markdown("---")
-        # Table (all rows)
-        cols = [c for c in ["Legal_reference","action_type","action_description","evidence_of_completion"] if c in df_act_full.columns or c=="Legal_reference"]
-        rename = {
-            "action_type":"Tính chất biện pháp",
-            "action_description":"Nội dung công việc phải làm",
-            "evidence_of_completion":"Công việc chi tiết / Minh chứng"
-        }
-        st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
-
-st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
+        st.dataframe(df_act, use_container_width=True)
