@@ -512,7 +512,7 @@ with st.sidebar:
 # HEADER CHÍNH (ĐÃ THIẾT KẾ LẠI)
 # ==============================
 
-col_logo, col_title, col_spacer = st.columns([5, 5, 2])
+col_logo, col_title, col_spacer = st.columns([2, 5, 2])
 
 with col_logo:
     # Gợi ý: Lưu logo NHNN dạng ban đầu vào file logo_nhnn.png
