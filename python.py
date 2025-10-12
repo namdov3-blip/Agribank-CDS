@@ -183,7 +183,8 @@ hr {
   display: block;
   padding: 16px 18px 14px 18px; /* đủ thoáng */
   background: #fff;
-  border: 1.5px solid var(--border-color);   /* viền bao quanh */
+  border: 3px solid var(--border-color);   /* viền bao quanh */
+  border-left: 8px solid var(--primary-color); /* điểm nhấn màu chủ đạo */
   border-radius: 16px;
   min-height: 72px;
   margin-bottom: 12px;
