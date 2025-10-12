@@ -14,7 +14,6 @@ from google import genai
 from google.genai.errors import APIError
 import time
 
-st.set_page_config(
 # ==============================
 # HEADER CUSTOM DESIGN (SBV STYLE)
 # ==============================
@@ -71,8 +70,6 @@ st.markdown("""
     <div class="bottom-title">DBND</div>
 </div>
 """, unsafe_allow_html=True)
-
-)
 
 # --- Gemini Client Initialization (ĐÃ SỬA LỖI: Thêm khởi tạo client) ---
 gemini_client = None
