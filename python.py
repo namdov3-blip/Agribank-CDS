@@ -15,8 +15,7 @@ from google.genai.errors import APIError
 import time
 
 st.set_page_config(
-    page_title="Dashboard Kết luận Thanh tra (KLTT)",
-    page_icon="🛡️",
+    page_title="Ngân Hàng Nhà Nước Khu Vực Hà Nội I",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -409,7 +408,7 @@ with st.sidebar:
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
 
-st.title("🛡️ Dashboard Báo Cáo Kết Luận Thanh Tra")
+st.title("Ngân Hàng Nhà Nước Khu Vực Hà Nội I")
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
@@ -478,13 +477,13 @@ with tab_gemini:
 
 # ---- Documents (GIỮ NGUYÊN) ----
 with tab_docs:
-    st.header("Báo Cáo Kết Luận Thanh Tra (Metadata)")
+    st.header("Báo Cáo Kết Luận Thanh Tra")
     st.markdown("---")
     if len(df_docs) == 0:
         st.info("Không có dữ liệu documents.")
     else:
         for idx, row in df_docs.reset_index(drop=True).iterrows():
-            st.markdown(f'<div class="doc-wrap"><div class="doc-title">📝 Báo cáo kết luận thanh tra — {str(row.get("doc_id","—"))}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="doc-wrap"><div class="doc-title"> Báo cáo kết luận thanh tra — {str(row.get("doc_id","—"))}</div>', unsafe_allow_html=True)
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 info_card("Mã số kết luận thanh tra (Doc_id)", str(row.get("doc_id","—")))
@@ -612,7 +611,7 @@ with tab_over:
 
 # ---- Findings (GIỮ NGUYÊN) ----
 with tab_find:
-    st.header("Phát hiện & Nguyên nhân (Findings)")
+    st.header("Tổng quan về các Vi phạm đã Phát hiện và Phân tích Nguyên nhân")
     st.subheader(f"Đang lọc theo: {len(selected_refs)}/{len(all_refs)} legal_reference")
     st.markdown("---")
     if f_df.empty:
@@ -683,7 +682,7 @@ with tab_find:
 
 # ---- Actions (GIỮ NGUYÊN) ----
 with tab_act:
-    st.header("Biện pháp khắc phục (Actions)")
+    st.header("Biện pháp khắc phục")
     st.markdown("---")
     if df_act is None or df_act.empty:
         st.info("Không có sheet actions hoặc thiếu cột. Cần: action_type, legal_reference, action_description, evidence_of_completion.")
