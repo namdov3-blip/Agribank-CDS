@@ -178,14 +178,17 @@ hr {
 }
 
 /* Info Card */
-.info-card { 
-    padding: 20px 15px; 
-    border: 5px solid #e8e8e8; 
-    border-left: 5px solid var(--primary-color); /* Điểm nhấn màu chủ đạo */
-    border-radius: 20px; 
-    background: #fff; 
-    min-height: 72px; 
-    margin-bottom: 10px;
+.info-card{
+  position: relative;
+  display: block;
+  padding: 16px 18px 14px 18px; /* đủ thoáng */
+  background: #fff;
+  border: 1.5px solid var(--border-color);   /* viền bao quanh */
+  border-left: 6px solid var(--primary-color); /* điểm nhấn màu chủ đạo */
+  border-radius: 16px;
+  min-height: 72px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.02);
 }
 .info-card .label { 
     font-size: 16px; 
