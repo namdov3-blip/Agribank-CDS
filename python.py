@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 import plotly.express as px
-import requests  # THƯ VIỆN ĐỂ GỌI n8n Webhook
+import requests  # THƯ VIỆN ĐỂ GỌI n8n Webhook
 from google import genai
 from google.genai.errors import APIError
 import time
