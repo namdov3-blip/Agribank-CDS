@@ -518,9 +518,16 @@ with col_logo:
         st.markdown(f'<div style="height: 120px;"></div>', unsafe_allow_html=True)
 
 with col_title:
-    st.markdown(f'<h3 style="color:#a50000; margin-bottom: -15px; font-weight: 500;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</h3>', unsafe_allow_html=True)
-    st.markdown(f'<h1 style="color:#a50000; font-size: 2.5rem; margin-top: 5px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', unsafe_allow_html=True)
-    st.markdown(f'<p style="color:#333333; margin-top: -15px;">DBND</p>', unsafe_allow_html=True)
+     # Sử dụng CSS để căn giữa và áp dụng màu Nâu Vàng
+    header_style = "text-align: center; color: var(--primary-color); margin-bottom: 0px;"
+    
+    st.markdown(f'<p style="{header_style} font-size: 1.1rem; font-weight: 500; margin-top: 15px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', unsafe_allow_html=True)
+    
+    # Tiêu đề chính to nhất
+    st.markdown(f'<h1 style="{header_style} font-size: 2.8rem; margin-top: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', unsafe_allow_html=True)
+    
+    # DBND
+    st.markdown(f'<p style="{header_style} font-size: 1rem; margin-top: -10px;">DBND</p>', unsafe_allow_html=True)
 
 st.markdown("---") # Đường phân cách sau Header
 
