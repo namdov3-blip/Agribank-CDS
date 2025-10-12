@@ -499,10 +499,8 @@ with st.sidebar:
     # Gợi ý: Lưu logo NHNN dạng crop (vuông) vào file logo_nhnn_sidebar.png
     # Thay thế "logo_nhnn_sidebar.png" bằng đường dẫn file logo của bạn.
     try:
-        st.image("logo_nhnn.png", width=30) 
-    except:
-        # Nếu không tìm thấy file logo, chỉ hiển thị tiêu đề
-        st.markdown(f'<h1 style="color:#1f6feb; font-size: 1.5rem; border-bottom: none;">NHNN Việt Nam</h1>', unsafe_allow_html=True)
+        st.image("logo_nhnn.png", width=60)
+        st.markdown(f'<h1 style="color:#1f6feb; font-size: 1.5rem; border-bottom: none;">NHNN Việt Nam</h1>')
 
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
