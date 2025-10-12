@@ -191,7 +191,7 @@ hr {
   box-shadow: 0 1px 0 rgba(0,0,0,.02);
 }
 .info-card .label { 
-    font-size: 16px; 
+    font-size: 20px; 
     color: var(--primary-color); 
     font-weight: 700; 
     margin-bottom: 4px; 
