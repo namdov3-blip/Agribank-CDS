@@ -15,70 +15,12 @@ from google.genai.errors import APIError
 import time
 
 st.set_page_config(
-    page_title="Ngân Hàng Nhà Nước Khu Vực Hà Nội I",
+    page_title="Ngân Hàng Nhà Nước Việt Nam",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ==============================
-# HEADER CUSTOM DESIGN (SBV STYLE)
-# ==============================
-st.markdown("""
-<style>
-/* Toàn bộ phần header nền vàng gold nhẹ */
-.header-sbv {
-    background-color: #fdf8ee;
-    padding: 20px 0;
-    text-align: center;
-    border-bottom: 2px solid #d4af37;
-    position: relative;
-}
-
-/* Logo bên trái */
-.header-sbv img {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-260px);
-    top: 20px;
-    width: 90px;
-}
-
-/* Dòng 1: dashboard nhỏ */
-.header-sbv .sub-title {
-    font-size: 14px;
-    color: #b58a00;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-    font-weight: 500;
-}
-
-/* Dòng 2: tên ngân hàng lớn */
-.header-sbv .main-title {
-    font-size: 24px;
-    font-weight: 800;
-    color: #7a5b00;
-    margin: 2px 0;
-}
-
-/* Dòng 3: chữ DBND nhỏ */
-.header-sbv .bottom-title {
-    font-size: 16px;
-    color: #b58a00;
-    margin-top: 2px;
-    font-weight: 600;
-}
-</style>
-
-<div class="header-sbv">
-    <img src="logo_nhnn.png">
-    <div class="sub-title">Dashboard tổng hợp phân tích báo cáo</div>
-    <div class="main-title">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</div>
-    <div class="bottom-title">DBND</div>
-</div>
-""", unsafe_allow_html=True)
-
-
-# --- Gemini Client Initialization (ĐÃ SỬA LỖI: Thêm khởi tạo client) ---
+# --- Gemini Client Initialization ---
 gemini_client = None
 if "GEMINI_API_KEY" in st.secrets:
     try:
@@ -147,7 +89,8 @@ def format_vnd(n):
     return f"{n:,.0f} ₫"
 
 # ===== Plot helpers for Overalls (GIỮ NGUYÊN) =====
-PALETTE = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#0ea5e9", "#a855f7", "#22c55e", "#e11d48", "#6b7280"]
+# Điều chỉnh bảng màu để phù hợp hơn với tông Vàng/Đỏ Đô
+PALETTE = ["#70573e", "#a50000", "#f59e0b", "#1f6feb", "#16a34a", "#ef4444", "#0ea5e9", "#a855f7", "#6b7280"]
 
 def _format_vnd_text(v):
     if pd.isna(v): return "—"
@@ -175,7 +118,7 @@ def make_bar(df_in, x_col="Chỉ tiêu", y_col="Giá trị", title="", height=26
         texttemplate="<b>%{text}</b>",
         marker_line_color="white",
         marker_line_width=0.5,
-        textfont=dict(color="#0ea5e9", size=12)
+        textfont=dict(color="#70573e", size=12) # Màu chữ tương ứng với màu chủ đạo NHNN
     )
     fig.update_layout(
         height=height, bargap=0.40,
@@ -197,21 +140,94 @@ def make_pie(labels_vals, title="", height=260):
     return fig
 
 # ==============================
-# Theme + CSS (GIỮ NGUYÊN)
+# Theme + CSS (ĐÃ SỬA ĐỔI CHO UX/UI NHNN TÔNG VÀNG/ĐỎ ĐÔ)
 # ==============================
 
 st.markdown("""
 <style>
-:root { --label-color: #1f6feb; }
+:root { 
+    --primary-color: #70573e; /* Màu Nâu Vàng từ logo (Chủ đạo) */
+    --secondary-color: #a50000; /* Màu Đỏ Đô (Nhấn mạnh: Biểu đồ, Alert) */
+    --background-light: #fafaf4; /* Nền kem nhẹ */
+}
+/* Áp dụng nền kem cho toàn bộ trang */
+[data-testid="stAppViewContainer"] {
+    background-color: var(--background-light);
+}
+/* Tiêu đề tổng quát */
+h1, h2, h3, h4 {
+    color: var(--primary-color);
+}
+h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+}
+h2 {
+    font-size: 1.8rem;
+    border-bottom: 2px solid #e6e6e6; /* Đường phân cách nhẹ */
+    padding-bottom: 5px;
+    margin-top: 1.5rem;
+}
+/* Thanh phân cách */
+hr {
+    border-top: 1px solid var(--primary-color); /* Màu nâu vàng chủ đạo */
+}
+
+/* Dataframe */
 [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
     white-space: pre-wrap !important;
     word-break: break-word !important;
 }
-.info-card { padding: 10px 12px; border: 1px solid #e8e8e8; border-radius: 10px; background: #fff; min-height: 72px; }
-.info-card .label { font-size: 12px; color: var(--label-color); font-weight: 700; margin-bottom: 4px; }
-.info-card .value { font-size: 15px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
-.doc-wrap { padding: 10px 14px; border: 1px solid #e6e6e6; border-radius: 12px; background: #fafcff; margin-bottom: 14px; }
-.doc-title { font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+
+/* Info Card */
+.info-card { 
+    padding: 10px 12px; 
+    border: 1px solid #e8e8e8; 
+    border-left: 5px solid var(--primary-color); /* Điểm nhấn màu chủ đạo */
+    border-radius: 10px; 
+    background: #fff; 
+    min-height: 72px; 
+    margin-bottom: 10px;
+}
+.info-card .label { 
+    font-size: 12px; 
+    color: var(--primary-color); 
+    font-weight: 700; 
+    margin-bottom: 4px; 
+}
+.info-card .value { 
+    font-size: 16px; 
+    line-height: 1.4; 
+    white-space: pre-wrap; 
+    word-break: break-word; 
+    font-weight: 600;
+}
+
+/* Document Wrap */
+.doc-wrap { 
+    padding: 15px; 
+    border: 1px solid var(--secondary-color); /* Viền đỏ đô */
+    border-radius: 12px; 
+    background: #fff0f0; /* Nền rất nhạt */
+    margin-bottom: 14px; 
+}
+.doc-title { 
+    font-weight: 700; 
+    font-size: 18px; 
+    color: var(--secondary-color); /* Tiêu đề đỏ đô */
+    margin-bottom: 10px; 
+}
+
+/* Tabs Accent */
+button[data-testid^="stTab"]:focus {
+    color: var(--primary-color) !important; 
+    border-bottom: 2px solid var(--primary-color) !important; 
+}
+
+/* Ẩn logo cũ của Streamlit ở sidebar (tùy chọn) */
+[data-testid="stSidebar"] img {
+    opacity: 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -228,7 +244,7 @@ def info_card(label, value):
     )
 
 # ==============================
-# RAG CHATBOT LOGIC (ĐÃ SỬA LỖI: Thêm key cho button)
+# RAG CHATBOT LOGIC (ĐÃ THÊM KEY CHO BUTTON & INPUT)
 # ==============================
 
 def call_n8n_chatbot(prompt: str):
@@ -279,7 +295,8 @@ def rag_chat_tab():
     """Thêm khung chat RAG kết nối qua n8n Webhook vào tab."""
     st.header("🤖 Internal RAG")
     st.write("Sử dụng RAG Bot để hỏi đáp về dữ liệu KLTT")
-    # SỬA LỖI: Thêm key="rag_reset_button" để tránh trùng lặp ID
+    
+    # ĐÃ THÊM KEY
     if st.button("🔄 Bắt đầu phiên Chat mới", type="primary", key="rag_reset_button"):
         reset_rag_chat_session()
         return
@@ -302,6 +319,7 @@ def rag_chat_tab():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
+    # ĐÃ THÊM KEY
     if user_prompt := st.chat_input("Hỏi Trợ lý RAG...", key="rag_chat_input"):
         if st.session_state.rag_chat_counter >= 5:
             with st.chat_message("assistant"):
@@ -321,7 +339,7 @@ def rag_chat_tab():
                 st.session_state.rag_chat_counter += 1
 
 # ==============================
-# GEMINI CHATBOT LOGIC (ĐÃ SỬA LỖI: Thêm key cho button)
+# GEMINI CHATBOT LOGIC (ĐÃ THÊM KEY CHO BUTTON & INPUT)
 # ==============================
 def reset_gemini_chat_session():
     """Hàm này sẽ reset toàn bộ lịch sử chat và session ID."""
@@ -337,7 +355,7 @@ def gemini_chat_tab(client: genai.Client):
     st.write("Sử dụng Gemini để hỏi đáp về mọi chủ đề (tài chính, lập trình, kiến thức chung,...)")
     
     # --- LOGIC RESET ---
-    # SỬA LỖI: Thêm key="gemini_reset_button" để tránh trùng lặp ID
+    # ĐÃ THÊM KEY
     if st.button("🔄 Bắt đầu phiên Chat mới", type="primary", key="gemini_reset_button"):
         reset_gemini_chat_session()
         return
@@ -364,6 +382,7 @@ def gemini_chat_tab(client: genai.Client):
             st.markdown(message["content"])
 
     # Lấy đầu vào từ người dùng
+    # ĐÃ THÊM KEY
     if prompt := st.chat_input("Nhập câu hỏi của bạn...", key="gemini_chat_input"):
         
         # --- LOGIC KIỂM TRA GIỚI HẠN ---
@@ -483,15 +502,65 @@ COL_MAP = {
 }
 
 # ==============================
-# Sidebar (Upload + Filters) (GIỮ NGUYÊN)
+# Sidebar (Upload + Filters) (ĐÃ SỬA ĐỔI CHO UX/UI NHNN)
 # ==============================
 
 with st.sidebar:
+    # --- LOGO VÀ TIÊU ĐỀ TRONG SIDEBAR ---
+    try:
+        # Tải logo nhỏ/vuông cho Sidebar
+        st.image("logo_nhnn_sidebar.png", width=60) 
+    except:
+        # Nếu không tìm thấy file logo, chỉ hiển thị tiêu đề (Màu Nâu Vàng)
+        st.markdown(f'<h1 style="color:var(--primary-color); font-size: 1.5rem; border-bottom: none;">NHNN Việt Nam</h1>', unsafe_allow_html=True)
+    
     st.header("📤 Tải dữ liệu")
     uploaded = st.file_uploader("Excel (.xlsx): documents, overalls, findings, (actions tuỳ chọn)", type=["xlsx"])
     st.caption("Tên sheet & cột không phân biệt hoa/thường.")
 
-st.title("Ngân Hàng Nhà Nước Khu Vực Hà Nội I")
+# ==============================
+# HEADER CHÍNH (ĐÃ THIẾT KẾ LẠI THEO YÊU CẦU MÀU GOLD/NÂU VÀNG)
+# ==============================
+
+col_logo, col_title, col_spacer = st.columns([1.5, 7, 1.5]) # Thêm cột spacer để căn giữa tốt hơn
+
+with col_logo:
+    # 1. LOGO (Bên Trái)
+    try:
+        st.image("logo_nhnn.png", width=120) 
+    except:
+        # Giữ khoảng trống nếu không có logo
+        st.markdown(f'<div style="height: 120px;"></div>', unsafe_allow_html=True) 
+
+with col_title:
+    # 2. TIÊU ĐỀ (Giữa)
+    # Căn giữa và sử dụng màu Nâu Vàng/Đỏ Đô
+    primary_color = "var(--primary-color)" # #70573e Nâu Vàng
+    
+    # Dòng 1: DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO (nhỏ)
+    st.markdown(
+        f'<p style="text-align: center; color: {primary_color}; font-size: 1.1rem; font-weight: 500; margin-top: 20px; margin-bottom: 0px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', 
+        unsafe_allow_html=True
+    )
+    
+    # Dòng 2: NGÂN HÀNG NHÀ NƯỚC VIỆT NAM (to)
+    st.markdown(
+        f'<h1 style="text-align: center; color: {primary_color}; font-size: 2.8rem; margin-top: 0px; margin-bottom: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', 
+        unsafe_allow_html=True
+    )
+    
+    # Dòng 3: DBND (nhỏ)
+    st.markdown(
+        f'<p style="text-align: center; color: #333333; font-size: 1rem; margin-top: 0px;">DBND</p>', 
+        unsafe_allow_html=True
+    )
+
+with col_spacer:
+    st.markdown("") # Cột này giữ trống
+
+# Đường phân cách sau Header (có thể thay bằng viền đỏ như ảnh mẫu)
+st.markdown(f'<div style="height: 3px; background-color: var(--secondary-color); width: 100%;"></div>', unsafe_allow_html=True)
+
 
 if not uploaded:
     st.info("Vui lòng tải lên file Excel để bắt đầu.")
@@ -539,11 +608,13 @@ with st.sidebar:
     f_df = df_find[df_find["legal_reference_filter"].astype(str).isin([str(x) for x in selected_refs])].copy()
 
     st.markdown("---")
-    st.metric("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
-    st.metric("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
+    # SỬ DỤNG info_card trong sidebar để nhất quán
+    info_card("💸 Tổng tiền ảnh hưởng (lọc)", format_vnd(f_df["quantified_amount"].sum()))
+    info_card("👥 Tổng hồ sơ ảnh hưởng (lọc)", f"{int(f_df['impacted_accounts'].sum()) if 'impacted_accounts' in f_df.columns and pd.notna(f_df['impacted_accounts'].sum()) else '—'}")
+
 
 # ==============================
-# Tabs (ĐÃ HOÀN THIỆN)
+# Tabs (GIỮ NGUYÊN)
 # ==============================
 
 tab_docs, tab_over, tab_find, tab_act, tab_chat, tab_gemini = st.tabs(
@@ -586,32 +657,34 @@ with tab_docs:
                 info_card("Thời gian kết thúc (period_end)", pe.strftime("%d/%m/%Y") if pd.notna(pe) else "—")
             st.markdown("</div>", unsafe_allow_html=True)
 
-# ---- Overalls (GIỮ NGUYÊN) ----
+# ---- Overalls (ĐÃ SỬA DỤNG info_card CHO KPI) ----
 with tab_over:
     st.header("Thông Tin Tổng Quan")
     st.markdown("---")
     over_row = df_over.iloc[-1] if len(df_over) else pd.Series({})
 
-    # KPIs sơ lược
+    # KPIs sơ lược: Thay thế st.metric bằng info_card để thống nhất giao diện
     k1,k2,k3,k4,k5 = st.columns(5)
+    
     with k1:
-        st.metric("Tổng nhân sự", f"{int(over_row.get('staff_total', np.nan)) if pd.notna(over_row.get('staff_total', np.nan)) else '—'}")
-        st.metric("Mẫu kiểm tra", f"{int(over_row.get('sample_total_files', np.nan)) if pd.notna(over_row.get('sample_total_files', np.nan)) else '—'}")
+        info_card("Tổng nhân sự", f"{int(over_row.get('staff_total', np.nan)) if pd.notna(over_row.get('staff_total', np.nan)) else '—'}")
+        info_card("Mẫu kiểm tra", f"{int(over_row.get('sample_total_files', np.nan)) if pd.notna(over_row.get('sample_total_files', np.nan)) else '—'}")
     with k2:
-        st.metric("Phòng nghiệp vụ (HQ)", f"{int(over_row.get('departments_at_hq_count', np.nan)) if pd.notna(over_row.get('departments_at_hq_count', np.nan)) else '—'}")
-        st.metric("Phòng giao dịch", f"{int(over_row.get('transaction_offices_count', np.nan)) if pd.notna(over_row.get('transaction_offices_count', np.nan)) else '—'}")
+        info_card("Phòng nghiệp vụ (HQ)", f"{int(over_row.get('departments_at_hq_count', np.nan)) if pd.notna(over_row.get('departments_at_hq_count', np.nan)) else '—'}")
+        info_card("Phòng giao dịch", f"{int(over_row.get('transaction_offices_count', np.nan)) if pd.notna(over_row.get('transaction_offices_count', np.nan)) else '—'}")
     with k3:
-        st.metric("Nguồn vốn gần nhất", format_vnd(over_row.get("mobilized_capital_vnd", np.nan)))
+        info_card("Nguồn vốn gần nhất", format_vnd(over_row.get("mobilized_capital_vnd", np.nan)))
     with k4:
-        st.metric("Dư nợ gần nhất", format_vnd(over_row.get("loans_outstanding_vnd", np.nan)))
+        info_card("Dư nợ gần nhất", format_vnd(over_row.get("loans_outstanding_vnd", np.nan)))
     with k5:
-        st.metric("Nợ xấu (nhóm 3-5)", format_vnd(over_row.get("npl_total_vnd", np.nan)))
-        st.metric("Tỷ lệ NPL / Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f}%" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
-        st.metric("Tổng dư nợ đã kiểm tra", format_vnd(over_row.get("sample_outstanding_checked_vnd", np.nan)))
+        info_card("Nợ xấu (nhóm 3-5)", format_vnd(over_row.get("npl_total_vnd", np.nan)))
+        info_card("Tỷ lệ NPL / Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f}%" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
+        info_card("Tổng dư nợ đã kiểm tra", format_vnd(over_row.get("sample_outstanding_checked_vnd", np.nan)))
+
 
     st.markdown("---")
 
-    # 1) Chất lượng tín dụng Nhóm 1–3 (Bar + Pie)
+    # 1) Chất lượng tín dụng Nhóm 1–3 (Bar + Pie) (GIỮ NGUYÊN)
     st.subheader("**Chất lượng tín dụng (Nhóm 1–3)**")
     q_items = [
         ("Nhóm 1", "structure_quality_group1_vnd"),
@@ -632,7 +705,7 @@ with tab_over:
         fig_q_pie = make_pie([(r["Chỉ tiêu"], r["Giá trị"]) for _, r in dfq.iterrows()], title="Pie: Cơ cấu tỷ trọng")
         st.plotly_chart(fig_q_pie, use_container_width=True)
 
-    # 2) Kỳ hạn
+    # 2) Kỳ hạn (GIỮ NGUYÊN)
     st.subheader("**Cơ cấu theo kỳ hạn**")
     term_items = [
         ("Dư nợ ngắn hạn", "structure_term_short_vnd"),
@@ -646,7 +719,7 @@ with tab_over:
     fig_t = make_bar(dft, title="Kỳ hạn (bar nhỏ, mỗi cột 1 màu)")
     st.plotly_chart(fig_t, use_container_width=True)
 
-    # 3) Tiền tệ
+    # 3) Tiền tệ (GIỮ NGUYÊN)
     st.subheader("**Cơ cấu theo tiền tệ**")
     cur_items = [
         ("Dư nợ bằng VND", "structure_currency_vnd_vnd"),
@@ -660,7 +733,7 @@ with tab_over:
     fig_c = make_bar(dfc, title="Tiền tệ (bar nhỏ, nhãn đậm & màu)")
     st.plotly_chart(fig_c, use_container_width=True)
 
-    # 4) Mục đích vay
+    # 4) Mục đích vay (GIỮ NGUYÊN)
     st.subheader("**Cơ cấu theo mục đích vay**")
     pur_items = [
         ("BĐS / linh hoạt", "structure_purpose_bds_flexible_vnd"),
@@ -677,7 +750,7 @@ with tab_over:
     fig_p = make_bar(dfp, title="Mục đích vay (bar nhỏ)")
     st.plotly_chart(fig_p, use_container_width=True)
 
-    # 5) Thành phần kinh tế (luôn hiển thị cả 0)
+    # 5) Thành phần kinh tế (GIỮ NGUYÊN)
     st.subheader("**Cơ cấu theo thành phần kinh tế**")
     eco_items = [
         ("DN Nhà nước", "structure_econ_state_vnd"), 
@@ -685,7 +758,6 @@ with tab_over:
         ("DN tư nhân cá thể", "structure_econ_individuals_households_vnd"), 
     ]
     
-    # ... (Các bước lấy dữ liệu)
     eco_data = []
     for n, c in eco_items:
         val = over_row.get(c, np.nan) if c in df_over.columns else np.nan
@@ -739,55 +811,39 @@ with tab_find:
         order_sub = f_df["sub_category"].value_counts().index.tolist()
         for sub in order_sub:
             st.markdown(f"#### 🔹 {sub}")
-            sub_df = f_df[f_df["sub_category"]==sub].copy()
-            sub_df["legal_reference"] = sub_df["legal_reference_filter"]
-            cols_show = [c for c in ["description","legal_reference","quantified_amount","impacted_accounts","root_cause"] if c in sub_df.columns]
-            sub_df = sub_df[cols_show]
-            if "quantified_amount" in sub_df.columns:
-                sub_df["quantified_amount"] = sub_df["quantified_amount"].apply(format_vnd)
-            if "impacted_accounts" in sub_df.columns:
-                sub_df["impacted_accounts"] = sub_df["impacted_accounts"].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "—")
-            # Hiển thị dataframe
-            st.dataframe(sub_df, use_container_width=True)
-        
-        st.markdown("---")
-        st.subheader("Phân tích theo bộ luật")
-        tmp = f_df.copy()
-        tmp["legal_reference"] = tmp["legal_reference_filter"]
-        cols = ["legal_reference"]
-        if "root_cause" in tmp.columns: cols.append("root_cause")
-        if "recommendation" in tmp.columns: cols.append("recommendation")
-        law_tbl = tmp[cols].drop_duplicates().reset_index(drop=True)
-        law_tbl = law_tbl.rename(columns={
-            "legal_reference":"Legal_reference",
-            "root_cause":"Root_cause",
-            "recommendation":"Recommendation"
-        })
-        st.dataframe(law_tbl, use_container_width=True)
+            sub_df = f_df[f_df["sub_category"] == sub].copy()
+            
+            # Bảng tóm tắt
+            sum_q = format_vnd(sub_df["quantified_amount"].sum())
+            sum_i = int(sub_df["impacted_accounts"].sum()) if pd.notna(sub_df["impacted_accounts"].sum()) else "—"
+            st.markdown(f"**Tổng tiền ảnh hưởng:** {sum_q} | **Tổng hồ sơ ảnh hưởng:** {sum_i}")
+
+            # Bảng chi tiết
+            cols_to_show = ["legal_reference", "description", "root_cause", "quantified_amount", "impacted_accounts"]
+            sub_df_display = sub_df[cols_to_show].copy()
+            sub_df_display["quantified_amount"] = sub_df_display["quantified_amount"].apply(format_vnd)
+            sub_df_display["impacted_accounts"] = sub_df_display["impacted_accounts"].apply(lambda x: int(x) if pd.notna(x) else "—")
+            sub_df_display.columns = ["Văn bản/Luật", "Mô tả vi phạm", "Nguyên nhân gốc", "Giá trị ảnh hưởng", "Hồ sơ ảnh hưởng"]
+            st.dataframe(sub_df_display, use_container_width=True, height=200)
 
 # ---- Actions (GIỮ NGUYÊN) ----
 with tab_act:
-    st.header("Biện pháp khắc phục")
+    st.header("Các Hành Động Khắc Phục")
     st.markdown("---")
-    if df_act is None or df_act.empty:
-        st.info("Không có sheet actions hoặc thiếu cột. Cần: action_type, legal_reference, action_description, evidence_of_completion.")
+    if df_act.empty:
+        st.info("Không có dữ liệu actions.")
     else:
-        df_act_full = df_act.copy()
-        df_act_full["Legal_reference"] = coalesce_series_with_raw(df_act_full["legal_reference"], prefix="RAW")
-        # Chart
-        if "action_type" in df_act_full.columns:
-            act_count = df_act_full["action_type"].value_counts().reset_index()
-            act_count.columns = ["Action_type","Count"]
-            fig = px.pie(act_count, values="Count", names="Action_type", title="Phân loại tính chất biện pháp", hole=.35)
-            fig.update_traces(textinfo="percent+label")
-            st.plotly_chart(fig, use_container_width=True)
+        st.subheader("Phân tích loại hành động")
+        act_count = df_act["action_type"].value_counts().reset_index()
+        act_count.columns = ["Action_type","Count"]
+        fig4 = px.bar(act_count, x="Action_type", y="Count", text="Count", color="Action_type",
+                      title="Số lần xuất hiện theo Loại hành động")
+        fig4.update_traces(textposition="outside")
+        fig4.update_layout(height=380, xaxis_title="", yaxis_title="Số lần")
+        st.plotly_chart(fig4, use_container_width=True)
+
         st.markdown("---")
-        # Table (all rows)
-        cols = [c for c in ["Legal_reference","action_type","action_description","evidence_of_completion"] if c in df_act_full.columns or c=="Legal_reference"]
-        rename = {
-            "action_type":"Tính chất biện pháp",
-            "action_description":"Nội dung công việc phải làm",
-            "evidence_of_completion":"Công việc chi tiết / Minh chứng"
-        }
-        st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
-st.caption("© KLTT Dashboard • Streamlit • Altair • Plotly")
+        st.subheader("Chi tiết các hành động")
+        act_df_display = df_act.copy()
+        act_df_display.columns = ["Loại hành động", "Văn bản/Luật", "Mô tả hành động", "Bằng chứng hoàn thành"]
+        st.dataframe(act_df_display, use_container_width=True)
