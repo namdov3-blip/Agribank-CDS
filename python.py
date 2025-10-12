@@ -219,8 +219,9 @@ def reset_rag_chat_session():
 
 def rag_chat_tab():
     """Thêm khung chat RAG kết nối qua n8n Webhook vào tab."""
-    st.header("🤖 Trợ lý RAG (Hỏi & Đáp Dữ liệu KLTT)")
-    if st.button("🔄 Bắt đầu phiên Chat mới (Reset Lịch sử)", type="primary"):
+    st.header("🤖 Internal RAG")
+    st.write("Sử dụng RAG Bot để hỏi đáp về dữ liệu KLTT")
+    if st.button("🔄 Bắt đầu phiên Chat mới", type="primary"):
         reset_rag_chat_session()
         return 
 
@@ -265,8 +266,11 @@ def rag_chat_tab():
 # ==============================
 def gemini_chat_tab(client: genai.Client):
     """Thêm khung chat Gemini kết nối qua API."""
-    st.header("🧠 Trò Chuyện với Gemini 💬")
+    st.header("🤖 External Gemini")
     st.write("Sử dụng Gemini để hỏi đáp về mọi chủ đề (tài chính, lập trình, kiến thức chung,...)")
+     if st.button("🔄 Bắt đầu phiên Chat mới", type="primary"):
+        reset_rag_chat_session()
+        return 
     
     if not client:
         st.warning("Vui lòng cấu hình Khóa 'GEMINI_API_KEY' trong Streamlit Secrets để sử dụng tính năng chat.")
