@@ -523,7 +523,7 @@ with col_logo:
     # Gợi ý: Lưu logo NHNN dạng ban đầu vào file logo_nhnn.png
     # Thay thế "logo_nhnn.png" bằng đường dẫn file logo của bạn.
     try:
-        st.image("logo_nhnn.png", width=200) 
+        st.image("logo-nhnnvn-3.png", width=200) 
     except:
         st.markdown(f'<div style="height: 120px;"></div>', unsafe_allow_html=True)
 
