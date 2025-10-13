@@ -886,4 +886,4 @@ with tab_act:
             "evidence_of_completion":"Công việc chi tiết / Minh chứng"
         }
         st.dataframe(df_act_full[cols].rename(columns=rename), use_container_width=True, height=500)
-                                             st.caption("© KLTT Dashboard • DBND • 2025 • NHNN-P1")
+   st.caption("© KLTT Dashboard • DBND • 2025 • NHNN-P1")
