@@ -246,7 +246,7 @@ hr {
 
 /* Nút tab: chữ to, đậm, padding lớn hơn để dễ bấm */
 button[data-testid^="stTab"] {
-    font-size: var(--tab-font-size) !important;
+    font-size: 24px;
     font-weight: var(--tab-font-weight) !important;
     padding: 10px 22px !important;
     border-radius: 12px !important;
