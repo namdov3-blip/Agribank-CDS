@@ -219,24 +219,67 @@ hr {
     margin-bottom: 10px; 
 }
 
-/* Căn giữa các tabs bằng cách điều chỉnh flexbox của container */
+/* Căn giữa vùng nội dung chính của dashboard */
+.block-container {
+    max-width: 1200px;      /* bạn có thể tăng/giảm 1100–1400 */
+    margin: 0 auto !important;
+}
+
+/* ===== TABS: căn giữa + cỡ chữ to + nhấn trạng thái chọn ===== */
+
+/* Container của tabs */
+[data-testid="stTabs"] {
+    display: flex;
+    justify-content: center;          /* căn giữa toàn bộ thanh tab */
+}
+
+/* Dàn các tab nằm giữa, khoảng cách vừa phải và co giãn tốt trên mọi màn hình */
 [data-testid="stTabs"] > div {
-    justify-content: center !important; 
-    gap: 500px; /* Thêm khoảng cách giữa các tab */
+    display: flex;
+    justify-content: center !important;
+    gap: 24px;                         /* thay vì 500px gây vỡ layout */
+    flex-wrap: wrap;                   /* xuống dòng đẹp trên màn hình hẹp */
+    width: 100%;
+    max-width: 1200px;                 /* đồng bộ với .block-container */
+    margin: 0 auto;
 }
-/* Phóng to font chữ của từng tab */
+
+/* Nút tab: chữ to, đậm, padding lớn hơn để dễ bấm */
 button[data-testid^="stTab"] {
-    font-size: 1.5rem !important; /* CỠ CHỮ LỚN: 1.5rem tương đương khoảng 24px */
-    font-weight: 700 !important; /* Làm chữ đậm hơn */
-    padding: 12px 25px !important; /* Tăng padding để tab to hơn */
-    color: #333333 !important; /* Đổi màu chữ cơ bản để nổi bật hơn */
-    white-space: nowrap; /* Ngăn ngắt dòng */
+    font-size: var(--tab-font-size) !important;
+    font-weight: var(--tab-font-weight) !important;
+    padding: 10px 22px !important;
+    border-radius: 12px !important;
+    transition: all .15s ease-in-out;
+    color: #2b2b2b;
+    background: transparent;
+    border: none;
 }
-/* Tabs Accent */
-button[data-testid^="stTab"]:focus {
-    color: var(--primary-color) !important; 
-    border-bottom: 4px solid var(--primary-color) !important; 
+
+/* Hover: đổi màu chữ nhẹ và thêm nền mờ */
+button[data-testid^="stTab"]:hover {
+    color: var(--primary-color) !important;
+    background: rgba(112, 87, 62, 0.08) !important;
 }
+
+/* Tab đang được chọn: tô màu chủ đạo + gạch chân dày và bóng đổ nhẹ */
+button[data-testid^="stTab"][aria-selected="true"] {
+    color: var(--primary-color) !important;
+    position: relative;
+    font-weight: 800 !important;
+}
+button[data-testid^="stTab"][aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    left: 16px; right: 16px; bottom: -6px;
+    height: 4px;
+    background: var(--primary-color);
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(112,87,62,.25);
+}
+
+/* Thu gọn khoảng cách dọc trên/dưới thanh tab để cân đối với header */
+[data-testid="stTabs"] { margin-top: 4px; margin-bottom: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
