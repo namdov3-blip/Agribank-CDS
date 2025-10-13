@@ -168,7 +168,7 @@ h2 {
 }
 /* Thanh phân cách */
 hr {
-    border-top: 1px solid var(--primary-color); /* Màu xanh chủ đạo */
+    border-top: 1.8px solid var(--primary-color); /* Màu xanh chủ đạo */
 }
 
 /* Dataframe */
@@ -226,9 +226,11 @@ hr {
 }
 /* Phóng to font chữ của từng tab */
 button[data-testid^="stTab"] {
-    font-size: 20px !important; /* Cỡ chữ lớn hơn */
-    font-weight: 1400; /* Làm chữ đậm hơn */
-    padding: 10px 20px; /* Tăng padding để tab to hơn */
+    font-size: 1.5rem !important; /* CỠ CHỮ LỚN: 1.5rem tương đương khoảng 24px */
+    font-weight: 700 !important; /* Làm chữ đậm hơn */
+    padding: 12px 25px !important; /* Tăng padding để tab to hơn */
+    color: #333333 !important; /* Đổi màu chữ cơ bản để nổi bật hơn */
+    white-space: nowrap; /* Ngăn ngắt dòng */
 }
 /* Tabs Accent */
 button[data-testid^="stTab"]:focus {
