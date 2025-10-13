@@ -531,13 +531,13 @@ with col_title:
      # Sử dụng CSS để căn giữa và áp dụng màu Nâu Vàng
     header_style = "text-align: center; color: var(--primary-color); margin-bottom: 0px;"
     
-    st.markdown(f'<p style="{header_style} font-size: 1.1rem; font-weight: 500; margin-top: 15px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="{header_style} font-size: 3rem; font-weight: 500; margin-top: 15px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', unsafe_allow_html=True)
     
     # Tiêu đề chính to nhất
-    st.markdown(f'<h1 style="{header_style} font-size: 2.8rem; margin-top: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', unsafe_allow_html=True)
+    st.markdown(f'<h1 style="{header_style} font-size: 5rem; margin-top: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', unsafe_allow_html=True)
     
     # DBND
-    st.markdown(f'<p style="{header_style} font-size: 1rem; margin-top: -10px;">DBND</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="{header_style} font-size: 2rem; margin-top: -10px;">DBND</p>', unsafe_allow_html=True)
 
 st.markdown("---") # Đường phân cách sau Header
 
