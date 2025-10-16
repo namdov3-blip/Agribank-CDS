@@ -797,7 +797,7 @@ with tab_find:
     if f_df.empty:
         st.warning("Không có dữ liệu theo bộ lọc hiện tại.")
     else:
-        col1 = st.columns(2)
+        col1 = st.columns(1)
         with col1:
             cat_count = f_df["category"].value_counts().reset_index()
             cat_count.columns = ["Category","Count"]
