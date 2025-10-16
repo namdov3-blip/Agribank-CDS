@@ -794,6 +794,7 @@ with tab_find:
     st.header("Tổng quan về các Vi phạm đã Phát hiện và Phân tích Nguyên nhân")
     st.subheader(f"Đang lọc theo: {len(selected_refs)}/{len(all_refs)} legal_reference")
     st.markdown("---")
+    
     if f_df.empty:
         st.warning("Không có dữ liệu theo bộ lọc hiện tại.")
     else:
@@ -805,8 +806,8 @@ with tab_find:
             fig1.update_layout(height=380, xaxis_title="", yaxis_title="Số lần")
             st.plotly_chart(fig1, use_container_width=True)
 
-    st.markdown("---")
-        st.subheader("Xu hướng theo Legal_reference")
+st.markdown("---")
+st.subheader("Xu hướng theo Legal_reference")
         legal_count = f_df["legal_reference_chart"].value_counts().reset_index()
         legal_count.columns = ["Legal_reference","Count"]
         fig3 = px.line(legal_count, x="Legal_reference", y="Count", markers=True,
