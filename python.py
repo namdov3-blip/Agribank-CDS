@@ -798,6 +798,8 @@ with tab_find:
     if f_df.empty:
         st.warning("Không có dữ liệu theo bộ lọc hiện tại.")
     else:
+            col1, col2 = st.columns(2)
+        with col1:
             cat_count = f_df["category"].value_counts().reset_index()
             cat_count.columns = ["Category","Count"]
             fig1 = px.bar(cat_count, x="Category", y="Count", text="Count", color="Category",
@@ -805,9 +807,16 @@ with tab_find:
             fig1.update_traces(textposition="outside")
             fig1.update_layout(height=380, xaxis_title="", yaxis_title="Số lần")
             st.plotly_chart(fig1, use_container_width=True)
+        with col2:
+            cat_sub = f_df.groupby(["category","sub_category"]).size().reset_index(name="Count")
+            fig2 = px.bar(cat_sub, x="category", y="Count", color="sub_category",
+                          title="Category × Sub_category (số lần)", barmode="group",
+                          labels={"category":"Category","sub_category":"Sub_category","Count":"Số lần"})
+            fig2.update_layout(height=380)
+            st.plotly_chart(fig2, use_container_width=True)
 
-st.markdown("---")
-st.subheader("Xu hướng theo Legal_reference")
+        st.markdown("---")
+        st.subheader("Xu hướng theo Legal_reference")
         legal_count = f_df["legal_reference_chart"].value_counts().reset_index()
         legal_count.columns = ["Legal_reference","Count"]
         fig3 = px.line(legal_count, x="Legal_reference", y="Count", markers=True,
