@@ -191,10 +191,10 @@ hr {
   box-shadow: 0 1px 0 rgba(0,0,0,.02);
 }
 .info-card .label { 
-    font-size: 15px; 
+    font-size: 20px; 
     color: var(--primary-color); 
     font-weight: 700; 
-    margin-bottom: 10px; 
+    margin-bottom: 8px; 
 }
 .info-card .value { 
     font-size: 19px; 
