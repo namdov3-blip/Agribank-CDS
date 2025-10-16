@@ -703,7 +703,7 @@ with tab_over:
     with k5:
         info_card("Nợ xấu (nhóm 3-5)", format_vnd(over_row.get("npl_total_vnd", np.nan)))
         info_card("Tỷ lệ NPL / Dư nợ", f"{over_row.get('npl_ratio_percent', np.nan):.2f}%" if pd.notna(over_row.get('npl_ratio_percent', np.nan)) else "—")
-        info_card("Tổng dư nợ đã kiểm tra", format_vnd(over_row.get("sample_outstanding_checked_vnd", np.nan)))
+        info_card("Tổng dư nợ kiểm tra", format_vnd(over_row.get("sample_outstanding_checked_vnd", np.nan)))
 
 
     st.markdown("---")
