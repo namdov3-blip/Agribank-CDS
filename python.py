@@ -666,7 +666,7 @@ with tab_docs:
             with c1:
                 info_card("Mã số kết luận thanh tra", str(row.get("doc_id","—")))
                 info_card("Title", str(row.get("title","—")))
-                info_card("Ngày phát hành", d.strftime("%d/%m/%Y") if pd.notna(d) else "—")
+                info_card("Ngày phát hành", d.strftime("%d/%m/%Y") if pd.notna(ps) else "—")
             with c2:
                 d = row.get("issue_date", pd.NaT)
                 info_card("Đơn vị phát hành", str(row.get("issuing_authority","—")))
