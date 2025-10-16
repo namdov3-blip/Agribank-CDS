@@ -665,15 +665,15 @@ with tab_docs:
             c1, c2, c3, c4 = st.columns(4)
             with c1:
                 info_card("Mã số kết luận thanh tra", str(row.get("doc_id","—")))
-                info_card("Đơn vị phát hành", str(row.get("issuing_authority","—")))
-                info_card("Người kiểm soát", str(row.get("signer_name","—")))
+                info_card("Title", str(row.get("title","—")))
+                info_card("Ngày phát hành", d.strftime("%d/%m/%Y") if pd.notna(d) else "—")
             with c2:
                 d = row.get("issue_date", pd.NaT)
-                info_card("Ngày phát hành", d.strftime("%d/%m/%Y") if pd.notna(d) else "—")
+                info_card("Đơn vị phát hành", str(row.get("issuing_authority","—")))
                 info_card("Đơn vị được kiểm tra", str(row.get("inspected_entity_name","—")))
                 info_card("Chức vụ", str(row.get("signer_title","—")))
             with c3:
-                info_card("Title", str(row.get("title","—")))
+                info_card("Nội dung thanh tra", str(row.get("field_coverage","—")))
                 info_card("Lĩnh vực", str(row.get("sector","—")))
             with c4:
                 ps = row.get("period_start", pd.NaT); pe = row.get("period_end", pd.NaT)
