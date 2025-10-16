@@ -80,13 +80,26 @@ def safe_date(series: pd.Series):
     try: return pd.to_datetime(series, errors="coerce")
     except Exception: return pd.to_datetime(pd.Series([None]*len(series)), errors="coerce")
 
+def to_million_vnd(series: pd.Series):
+    """
+    Áp dụng to_number để chuyển đổi, sau đó chia cho 1,000,000.
+    Mục đích: Giữ nguyên giá trị số từ file Excel (đơn vị gốc thường là VND),
+    sau đó hiển thị dưới đơn vị triệu đồng.
+    """
+    return series.apply(to_number) / 1_000_000
+
+def safe_date(series: pd.Series):
+    try: return pd.to_datetime(series, errors="coerce")
+    except Exception: return pd.to_datetime(pd.Series([None]*len(series)), errors="coerce")
+
 def format_vnd(n):
-    if pd.isna(n): return "—"
-    n = float(n)
-    if abs(n) >= 1_000_000_000_000: return f"{n/1_000_000_000_000:.2f} nghìn tỷ ₫"
-    if abs(n) >= 1_000_000_000: return f"{n/1_000_000_000:.2f} tỷ ₫"
-    if abs(n) >= 1_000_000: return f"{n/1_000_000:.2f} triệu ₫"
-    return f"{n:,.0f} ₫"
+    """Định dạng giá trị đã được chia cho 1,000,000 (triệu đồng)."""
+    if pd.isna(n): return "—"
+    n = float(n)
+    # Các giá trị đã là TRIỆU ĐỒNG.
+    if abs(n) >= 1_000_000: return f"{n/1_000_000:,.2f} nghìn tỷ ₫" # Đã là triệu đồng, chia tiếp cho 1tr ra nghìn tỷ (10^12)
+    if abs(n) >= 1_000: return f"{n/1_000:,.2f} tỷ ₫" # Đã là triệu đồng, chia tiếp cho 1k ra tỷ (10^9)
+    return f"{n:,.0f} triệu ₫"
 
 # ===== Plot helpers for Overalls (GIỮ NGUYÊN) =====
 PALETTE = ["#1f6feb", "#16a34a", "#f59e0b", "#ef4444", "#0ea5e9", "#a855f7", "#22c55e", "#a50000", "#6b7280"]
@@ -496,8 +509,7 @@ COL_MAP = {
         "sector": ["sector","Sector"],
         "period_start": ["period_start","Period_start"],
         "period_end": ["period_end","Period_end"],
-        "signer_name": ["Signer_name","signer_name"],
-        "signer_title": ["Signer_title","signer_title"],
+        "field_coverage": ["Field_coverage","field_coverage"],
     },
     "overalls": {
         "departments_at_hq_count": ["departments_at_hq_count"],
@@ -579,10 +591,10 @@ with col_title:
     st.markdown(f'<p style="{header_style} font-size: 1.5rem; font-weight: 500; margin-top: 15px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', unsafe_allow_html=True)
     
     # Tiêu đề chính to nhất
-    st.markdown(f'<h1 style="{header_style} font-size: 3rem; margin-top: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM</h1>', unsafe_allow_html=True)
+    st.markdown(f'<h1 style="{header_style} font-size: 3rem; margin-top: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM KHU VỰC I</h1>', unsafe_allow_html=True)
     
     # DBND
-    st.markdown(f'<p style="{header_style} font-size: 1rem; margin-top: -10px;">DBND</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="{header_style} font-size: 1rem; margin-top: -10px;">HÀ NỘI</p>', unsafe_allow_html=True)
 
 st.markdown("---") # Đường phân cách sau Header
 
