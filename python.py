@@ -194,7 +194,7 @@ hr {
     font-size: 20px; 
     color: var(--primary-color); 
     font-weight: 700; 
-    margin-bottom: 8px; 
+    margin-bottom: 10px; 
 }
 .info-card .value { 
     font-size: 19px; 
