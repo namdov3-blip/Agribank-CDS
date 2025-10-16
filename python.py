@@ -805,7 +805,7 @@ with tab_find:
             fig1.update_layout(height=380, xaxis_title="", yaxis_title="Số lần")
             st.plotly_chart(fig1, use_container_width=True)
 
-        st.markdown("---")
+    st.markdown("---")
         st.subheader("Xu hướng theo Legal_reference")
         legal_count = f_df["legal_reference_chart"].value_counts().reset_index()
         legal_count.columns = ["Legal_reference","Count"]
