@@ -575,7 +575,7 @@ with col_title:
      # Sử dụng CSS để căn giữa và áp dụng màu Nâu Vàng
     header_style = "text-align: center; color: var(--primary-color); margin-bottom: 0px;"
     
-    st.markdown(f'<p style="{header_style} font-size: 1.5rem; font-weight: 500; margin-top: 15px;">DASHBOARD TỔNG HỢP PHÂN TÍCH BÁO CÁO</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="{header_style} font-size: 1.5rem; font-weight: 500; margin-top: 15px;">DASHBOARD SỐ HÓA TỔNG HỢP KẾT LUẬN THANH TRA</p>', unsafe_allow_html=True)
     
     # Tiêu đề chính to nhất
     st.markdown(f'<h1 style="{header_style} font-size: 3rem; margin-top: 0px;">NGÂN HÀNG NHÀ NƯỚC VIỆT NAM KHU VỰC I</h1>', unsafe_allow_html=True)
@@ -847,7 +847,7 @@ with tab_find:
             st.dataframe(sub_df, use_container_width=True)
         
         st.markdown("---")
-        st.subheader("Phân tích theo bộ luật")
+        st.subheader("Phân tích theo quy định pháp luật và quy định nội bộ")
         tmp = f_df.copy()
         tmp["legal_reference"] = tmp["legal_reference_filter"]
         cols = ["legal_reference"]
